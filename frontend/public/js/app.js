@@ -1,30 +1,12 @@
-// ========================================
-// SERVICORE - Aplicacion Principal
-// ========================================
 
-// ========================================
-// Estado Global y Funciones Externas
-// ========================================
-
-// Estas funciones y variables deben ser importadas o definidas en otro archivo
-// Por ahora se declaran como globales para evitar errores de linting
-
-/* global appState, login, logout, checkAuth, getStats, getTickets, getTicketById, 
-   addTicket, updateTicket, deleteTicket, getClients, addClient, getTeamUsers, 
-   addTeamUser, updateTeamUser, deleteTeamUser, getMessagesByTicketId, addMessage,
-   getDeliveryNotes, isClient, isAdmin, isTechnician, formatDate, formatDateTime */
-
-// ========================================
-// Navegacion
-// ========================================
 
 function navigateTo(page, params = {}) {
   appState.currentPage = page;
   appState.pageParams = params;
-  
+
   // Cerrar sidebar en movil
   closeSidebar();
-  
+
   // Renderizar la pagina correspondiente
   renderApp();
 }
@@ -69,29 +51,41 @@ const icons = {
 function renderStatusBadge(status) {
   const statusClasses = {
     open: 'badge-open',
+    abierto: 'badge-open',
     in_progress: 'badge-in-progress',
+    'en progreso': 'badge-in-progress',
     closed: 'badge-closed',
+    cerrado: 'badge-closed',
   };
   const statusLabels = {
     open: 'Abierto',
+    abierto: 'Abierto',
     in_progress: 'En Progreso',
+    'en progreso': 'En Progreso',
     closed: 'Cerrado',
+    cerrado: 'Cerrado',
   };
-  return `<span class="badge ${statusClasses[status]}">${statusLabels[status]}</span>`;
+  return `<span class="badge ${statusClasses[status] || 'badge-unknown'}">${statusLabels[status] || status}</span>`;
 }
 
 function renderPriorityBadge(priority) {
   const priorityClasses = {
     high: 'badge-high',
+    alta: 'badge-high',
     medium: 'badge-medium',
+    media: 'badge-medium',
     low: 'badge-low',
+    baja: 'badge-low',
   };
   const priorityLabels = {
     high: 'Alta',
+    alta: 'Alta',
     medium: 'Media',
+    media: 'Media',
     low: 'Baja',
+    baja: 'Baja',
   };
-  return `<span class="badge ${priorityClasses[priority]}">${priorityLabels[priority]}</span>`;
+  return `<span class="badge ${priorityClasses[priority] || 'badge-unknown'}">${priorityLabels[priority] || priority}</span>`;
 }
 
 function renderUserStatusBadge(status) {
@@ -105,7 +99,7 @@ function renderUserStatusBadge(status) {
 function renderSidebar() {
   const user = appState.currentUser;
   if (!user) return '';
-  
+
   const navItems = [
     { name: 'Dashboard', page: 'dashboard', icon: 'dashboard', roles: ['admin', 'technician'] },
     { name: 'Tickets', page: 'tickets', icon: 'ticket', roles: ['admin', 'technician', 'client'] },
@@ -113,9 +107,9 @@ function renderSidebar() {
     { name: 'Clientes', page: 'clients', icon: 'building', roles: ['admin', 'technician'] },
     { name: 'Equipo', page: 'users', icon: 'users', roles: ['admin'] },
   ];
-  
+
   const filteredNav = navItems.filter(item => item.roles.includes(user.role));
-  
+
   return `
     <aside class="sidebar ${appState.sidebarOpen ? 'open' : ''}" id="sidebar">
       <div class="sidebar-header">
@@ -225,10 +219,10 @@ function handleLogin(event) {
   const password = document.getElementById('password').value;
   const errorDiv = document.getElementById('loginError');
   const btn = document.getElementById('loginBtn');
-  
+
   btn.textContent = 'Iniciando sesion...';
   btn.disabled = true;
-  
+
   setTimeout(() => {
     if (login(email, password)) {
       navigateTo('dashboard');
@@ -244,14 +238,14 @@ function handleLogin(event) {
 // Pagina Dashboard
 // ========================================
 
-function renderDashboardPage() {
+async function renderDashboardPage() {
   const user = appState.currentUser;
+  const tickets = await fetchTickets();
   const stats = getStats();
-  const tickets = getTickets();
   const recentTickets = [...tickets]
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, 5);
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -261,10 +255,10 @@ function renderDashboardPage() {
           <div>
             <h1 class="page-title">Bienvenido, ${user.name.split(' ')[0]}</h1>
             <p class="page-subtitle">
-              ${isClient() 
-                ? `Estado de tus tickets de soporte para ${user.companyName || 'tu empresa'}.`
-                : 'Esto es lo que esta pasando con tus tickets de soporte hoy.'
-              }
+              ${isClient()
+      ? `Estado de tus tickets de soporte para ${user.companyName || 'tu empresa'}.`
+      : 'Esto es lo que esta pasando con tus tickets de soporte hoy.'
+    }
             </p>
           </div>
         </div>
@@ -312,9 +306,9 @@ function renderDashboardPage() {
               </a>
             </div>
             <div class="card-content">
-              ${recentTickets.length === 0 
-                ? '<div class="empty-state"><p class="empty-state-text">No hay tickets aun</p></div>'
-                : recentTickets.map(ticket => `
+              ${recentTickets.length === 0
+      ? '<div class="empty-state"><p class="empty-state-text">No hay tickets aun</p></div>'
+      : recentTickets.map(ticket => `
                   <div class="ticket-list-item" onclick="navigateTo('ticket-detail', { id: '${ticket.id}' })">
                     <div class="ticket-info">
                       <p class="ticket-title">${ticket.title}</p>
@@ -326,7 +320,7 @@ function renderDashboardPage() {
                     </div>
                   </div>
                 `).join('')
-              }
+    }
             </div>
           </div>
           
@@ -390,11 +384,11 @@ function renderDashboardPage() {
 // Pagina de Tickets
 // ========================================
 
-function renderTicketsPage() {
-  const tickets = getTickets();
+async function renderTicketsPage() {
+  const tickets = await fetchTickets();
   const clients = getClients();
   const technicians = getTeamUsers().filter(u => u.role === 'technician' && u.status === 'active');
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -404,10 +398,10 @@ function renderTicketsPage() {
           <div>
             <h1 class="page-title">${isClient() ? 'Mis Tickets' : 'Tickets'}</h1>
             <p class="page-subtitle">
-              ${isClient() 
-                ? `Ver tickets de ${appState.currentUser?.companyName || 'tu empresa'}`
-                : 'Gestiona y rastrea todos los tickets de soporte'
-              }
+              ${isClient()
+      ? `Ver tickets de ${appState.currentUser?.companyName || 'tu empresa'}`
+      : 'Gestiona y rastrea todos los tickets de soporte'
+    }
             </p>
           </div>
           <button class="btn btn-primary" onclick="openCreateTicketModal()">
@@ -496,9 +490,9 @@ function renderTicketsPage() {
               <div class="form-group">
                 <label class="form-label" for="ticketPriority">Prioridad</label>
                 <select id="ticketPriority" class="form-input form-select">
-                  <option value="low">Baja</option>
-                  <option value="medium" selected>Media</option>
-                  <option value="high">Alta</option>
+                  <option value="baja">Baja</option>
+                  <option value="media" selected>Media</option>
+                  <option value="alta">Alta</option>
                 </select>
               </div>
             ` : ''}
@@ -532,17 +526,17 @@ function renderTicketsPage() {
               <div class="form-group">
                 <label class="form-label" for="editTicketStatus">Estado</label>
                 <select id="editTicketStatus" class="form-input form-select">
-                  <option value="open">Abierto</option>
-                  <option value="in_progress">En Progreso</option>
-                  <option value="closed">Cerrado</option>
+                  <option value="abierto">Abierto</option>
+                  <option value="en progreso">En Progreso</option>
+                  <option value="cerrado">Cerrado</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label" for="editTicketPriority">Prioridad</label>
                 <select id="editTicketPriority" class="form-input form-select">
-                  <option value="low">Baja</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
+                  <option value="baja">Baja</option>
+                  <option value="media">Media</option>
+                  <option value="alta">Alta</option>
                 </select>
               </div>
             </div>
@@ -591,7 +585,7 @@ function renderTicketsTableBody(tickets) {
   if (tickets.length === 0) {
     return '';
   }
-  
+
   return tickets.map(ticket => `
     <tr>
       <td>
@@ -639,21 +633,32 @@ function filterTickets() {
   const status = document.getElementById('statusFilter').value;
   const priority = document.getElementById('priorityFilter')?.value || 'all';
   const client = document.getElementById('clientFilter')?.value || 'all';
-  
+
   let tickets = getTickets();
-  
+
   tickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.title.toLowerCase().includes(search) || 
-                          ticket.clientName.toLowerCase().includes(search);
-    const matchesStatus = status === 'all' || ticket.status === status;
-    const matchesPriority = priority === 'all' || ticket.priority === priority;
+    const matchesSearch = ticket.title.toLowerCase().includes(search) ||
+      ticket.description.toLowerCase().includes(search);
+
+    const ticketStatus = ticket.status.toLowerCase();
+    const statusMap = { 'abierto': 'open', 'en progreso': 'in_progress', 'cerrado': 'closed' };
+    const normalizedStatus = statusMap[ticketStatus] || ticketStatus;
+
+    const matchesStatus = status === 'all' || normalizedStatus === status || ticketStatus === status;
+
+    const ticketPriority = ticket.priority.toLowerCase();
+    const priorityMap = { 'baja': 'low', 'media': 'medium', 'alta': 'high' };
+    const normalizedPriority = priorityMap[ticketPriority] || ticketPriority;
+
+    const matchesPriority = priority === 'all' || normalizedPriority === priority || ticketPriority === priority;
     const matchesClient = client === 'all' || ticket.clientId === client;
+
     return matchesSearch && matchesStatus && matchesPriority && matchesClient;
   });
-  
+
   const tbody = document.getElementById('ticketsTableBody');
   const emptyDiv = document.getElementById('emptyTickets');
-  
+
   if (tickets.length === 0) {
     tbody.innerHTML = '';
     emptyDiv.classList.remove('hidden');
@@ -667,48 +672,48 @@ function openCreateTicketModal() {
   openModal('createTicketModal');
 }
 
-function handleCreateTicket(event) {
+async function handleCreateTicket(event) {
   event.preventDefault();
-  
+
   const title = document.getElementById('ticketTitle').value;
   const description = document.getElementById('ticketDescription').value;
   const clientId = isClient() ? appState.currentUser.companyId : document.getElementById('ticketClient').value;
-  const priority = isClient() ? 'medium' : document.getElementById('ticketPriority').value;
-  
+  const priority = isClient() ? 'media' : document.getElementById('ticketPriority').value;
+
   const client = getClients().find(c => c.id === clientId);
-  
-  addTicket({
+
+  await createTicket({
     title,
     description,
-    status: 'open',
+    status: 'abierto',
     priority,
     clientId,
     clientName: client?.name || appState.currentUser?.companyName || 'Desconocido',
   });
-  
+
   closeModal('createTicketModal');
-  navigateTo('tickets');
+  await navigateTo('tickets');
 }
 
-function openEditTicketModal(ticketId) {
-  const ticket = getTicketById(ticketId);
+async function openEditTicketModal(ticketId) {
+  const ticket = await fetchTicketById(ticketId);
   if (!ticket) return;
-  
+
   document.getElementById('editTicketId').value = ticket.id;
   document.getElementById('editTicketTitle').value = ticket.title;
   document.getElementById('editTicketDescription').value = ticket.description;
   document.getElementById('editTicketStatus').value = ticket.status;
   document.getElementById('editTicketPriority').value = ticket.priority;
-  document.getElementById('editTicketClient').value = ticket.clientId;
+  document.getElementById('editTicketClient').value = ticket.clientId || '';
   document.getElementById('editTicketAssigned').value = ticket.assignedTo || '';
-  
+
   closeAllDropdowns();
   openModal('editTicketModal');
 }
 
-function handleEditTicket(event) {
+async function handleEditTicket(event) {
   event.preventDefault();
-  
+
   const id = document.getElementById('editTicketId').value;
   const title = document.getElementById('editTicketTitle').value;
   const description = document.getElementById('editTicketDescription').value;
@@ -716,23 +721,21 @@ function handleEditTicket(event) {
   const priority = document.getElementById('editTicketPriority').value;
   const clientId = document.getElementById('editTicketClient').value;
   const assignedTo = document.getElementById('editTicketAssigned').value;
-  
-  const client = getClients().find(c => c.id === clientId);
-  const technician = getTeamUsers().find(u => u.id === assignedTo);
-  
-  updateTicket(id, {
+
+  // Los objetos de cliente y tecnico pueden no estar disponibles si son de la BD
+  // Enviamos lo que tenemos
+
+  await updateTicketAPI(id, {
     title,
     description,
     status,
     priority,
     clientId,
-    clientName: client?.name || 'Desconocido',
-    assignedTo: assignedTo || undefined,
-    assignedToName: technician?.name || undefined,
+    assignedTo
   });
-  
+
   closeModal('editTicketModal');
-  navigateTo('tickets');
+  await navigateTo('tickets');
 }
 
 function openDeleteTicketModal(ticketId) {
@@ -741,21 +744,21 @@ function openDeleteTicketModal(ticketId) {
   openModal('deleteTicketModal');
 }
 
-function handleDeleteTicket() {
+async function handleDeleteTicket() {
   const id = document.getElementById('deleteTicketId').value;
-  deleteTicket(id);
+  await deleteTicketAPI(id);
   closeModal('deleteTicketModal');
-  navigateTo('tickets');
+  await navigateTo('tickets');
 }
 
 // ========================================
 // Pagina Detalle de Ticket
 // ========================================
 
-function renderTicketDetailPage() {
+async function renderTicketDetailPage() {
   const ticketId = appState.pageParams?.id;
-  const ticket = getTicketById(ticketId);
-  
+  const ticket = await fetchTicketById(ticketId);
+
   if (!ticket) {
     return `
       <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
@@ -772,10 +775,10 @@ function renderTicketDetailPage() {
       </main>
     `;
   }
-  
+
   const messages = getMessagesByTicketId(ticketId);
   const technicians = getTeamUsers().filter(u => u.role === 'technician' && u.status === 'active');
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -823,16 +826,16 @@ function renderTicketDetailPage() {
               <div class="card-content" style="padding: 0;">
                 <div class="chat-container">
                   <div class="chat-messages" id="chatMessages">
-                    ${messages.length === 0 
-                      ? '<p style="text-align: center; color: var(--muted-foreground); padding: 2rem;">No hay mensajes aun</p>'
-                      : messages.map(msg => `
+                    ${messages.length === 0
+      ? '<p style="text-align: center; color: var(--muted-foreground); padding: 2rem;">No hay mensajes aun</p>'
+      : messages.map(msg => `
                         <div class="chat-message ${msg.senderRole === 'client' ? 'chat-message-client' : 'chat-message-team'}">
                           <div class="chat-message-sender">${msg.senderName}</div>
                           <div class="chat-message-content">${msg.content}</div>
                           <div class="chat-message-time">${formatDateTime(msg.timestamp)}</div>
                         </div>
                       `).join('')
-                    }
+    }
                   </div>
                   <div class="chat-input">
                     <input type="text" class="form-input" id="chatInput" placeholder="Escribe un mensaje...">
@@ -909,9 +912,9 @@ function assignTicket(ticketId, technicianId) {
 function sendMessage(ticketId) {
   const input = document.getElementById('chatInput');
   const content = input.value.trim();
-  
+
   if (!content) return;
-  
+
   const user = appState.currentUser;
   addMessage({
     ticketId,
@@ -920,10 +923,10 @@ function sendMessage(ticketId) {
     senderRole: user.role,
     content,
   });
-  
+
   input.value = '';
   navigateTo('ticket-detail', { id: ticketId });
-  
+
   // Scroll al final del chat
   setTimeout(() => {
     const chatMessages = document.getElementById('chatMessages');
@@ -939,7 +942,7 @@ function sendMessage(ticketId) {
 
 function renderClientsPage() {
   const clients = getClients();
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -1036,16 +1039,16 @@ function renderClientCards(clients) {
 function filterClients() {
   const search = document.getElementById('clientSearch').value.toLowerCase();
   let clients = getClients();
-  
-  clients = clients.filter(client => 
+
+  clients = clients.filter(client =>
     client.name.toLowerCase().includes(search) ||
     client.company.toLowerCase().includes(search) ||
     client.email.toLowerCase().includes(search)
   );
-  
+
   const grid = document.getElementById('clientsGrid');
   const emptyDiv = document.getElementById('emptyClients');
-  
+
   if (clients.length === 0) {
     grid.innerHTML = '';
     emptyDiv.classList.remove('hidden');
@@ -1057,14 +1060,14 @@ function filterClients() {
 
 function handleCreateClient(event) {
   event.preventDefault();
-  
+
   addClient({
     name: document.getElementById('clientName').value,
     company: document.getElementById('clientCompany').value,
     email: document.getElementById('clientEmail').value,
     phone: document.getElementById('clientPhone').value,
   });
-  
+
   closeModal('createClientModal');
   navigateTo('clients');
 }
@@ -1087,9 +1090,9 @@ function renderUsersPage() {
       </main>
     `;
   }
-  
+
   const teamUsers = getTeamUsers();
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -1278,15 +1281,15 @@ function renderUsersTableBody(users) {
 function filterUsers() {
   const search = document.getElementById('userSearch').value.toLowerCase();
   let users = getTeamUsers();
-  
-  users = users.filter(user => 
+
+  users = users.filter(user =>
     user.name.toLowerCase().includes(search) ||
     user.email.toLowerCase().includes(search)
   );
-  
+
   const tbody = document.getElementById('usersTableBody');
   const emptyDiv = document.getElementById('emptyUsers');
-  
+
   if (users.length === 0) {
     tbody.innerHTML = '';
     emptyDiv.classList.remove('hidden');
@@ -1298,14 +1301,14 @@ function filterUsers() {
 
 function handleCreateUser(event) {
   event.preventDefault();
-  
+
   addTeamUser({
     name: document.getElementById('userName').value,
     email: document.getElementById('userEmail').value,
     role: document.getElementById('userRole').value,
     status: 'active',
   });
-  
+
   closeModal('createUserModal');
   navigateTo('users');
 }
@@ -1313,27 +1316,27 @@ function handleCreateUser(event) {
 function openEditUserModal(userId) {
   const user = getTeamUsers().find(u => u.id === userId);
   if (!user) return;
-  
+
   document.getElementById('editUserId').value = user.id;
   document.getElementById('editUserName').value = user.name;
   document.getElementById('editUserEmail').value = user.email;
   document.getElementById('editUserRole').value = user.role;
   document.getElementById('editUserStatus').value = user.status;
-  
+
   closeAllDropdowns();
   openModal('editUserModal');
 }
 
 function handleEditUser(event) {
   event.preventDefault();
-  
+
   updateTeamUser(document.getElementById('editUserId').value, {
     name: document.getElementById('editUserName').value,
     email: document.getElementById('editUserEmail').value,
     role: document.getElementById('editUserRole').value,
     status: document.getElementById('editUserStatus').value,
   });
-  
+
   closeModal('editUserModal');
   navigateTo('users');
 }
@@ -1370,10 +1373,10 @@ function renderAlbaranesPage() {
   const notes = getDeliveryNotes();
   const clients = getClients();
   const technicians = getTeamUsers().filter(u => u.role === 'technician');
-  
+
   const totalHours = notes.reduce((sum, note) => sum + note.hoursWorked, 0);
   const uniqueClients = new Set(notes.map(n => n.clientId)).size;
-  
+
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
     ${renderSidebar()}
@@ -1383,10 +1386,10 @@ function renderAlbaranesPage() {
           <div>
             <h1 class="page-title">${isTechnician() ? 'Mis Albaranes' : 'Albaranes'}</h1>
             <p class="page-subtitle">
-              ${isTechnician() 
-                ? 'Ver tu trabajo completado y horas'
-                : 'Ver todos los albaranes de los tecnicos'
-              }
+              ${isTechnician()
+      ? 'Ver tu trabajo completado y horas'
+      : 'Ver todos los albaranes de los tecnicos'
+    }
             </p>
           </div>
         </div>
@@ -1435,16 +1438,16 @@ function renderAlbaranesPage() {
             </div>
           </div>
           <div class="card-content" id="albaranesContent">
-            ${notes.length === 0 
-              ? `<div class="empty-state">
+            ${notes.length === 0
+      ? `<div class="empty-state">
                   ${icons.fileText}
                   <p class="empty-state-text">No se encontraron albaranes</p>
                   <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">
                     Los albaranes se crean cuando se completan tickets
                   </p>
                 </div>`
-              : renderDeliveryNotes(notes)
-            }
+      : renderDeliveryNotes(notes)
+    }
           </div>
         </div>
       </div>
@@ -1495,20 +1498,20 @@ function filterAlbaranes() {
   const search = document.getElementById('albaranSearch').value.toLowerCase();
   const technician = document.getElementById('technicianFilter')?.value || 'all';
   const client = document.getElementById('albaranClientFilter').value;
-  
+
   let notes = getDeliveryNotes();
-  
+
   notes = notes.filter(note => {
     const matchesSearch = note.ticketTitle.toLowerCase().includes(search) ||
-                          note.clientName.toLowerCase().includes(search) ||
-                          note.description.toLowerCase().includes(search);
+      note.clientName.toLowerCase().includes(search) ||
+      note.description.toLowerCase().includes(search);
     const matchesTechnician = technician === 'all' || note.technicianId === technician;
     const matchesClient = client === 'all' || note.clientId === client;
     return matchesSearch && matchesTechnician && matchesClient;
   });
-  
+
   const content = document.getElementById('albaranesContent');
-  
+
   if (notes.length === 0) {
     content.innerHTML = `
       <div class="empty-state">
@@ -1548,7 +1551,7 @@ function closeAllDropdowns() {
 }
 
 // Cerrar dropdowns al hacer clic fuera
-document.addEventListener('click', function(event) {
+document.addEventListener('click', function (event) {
   if (!event.target.closest('.dropdown')) {
     closeAllDropdowns();
   }
@@ -1558,33 +1561,33 @@ document.addEventListener('click', function(event) {
 // Renderizador Principal de la App
 // ========================================
 
-function renderApp() {
+async function renderApp() {
   const app = document.getElementById('app');
-  
+
   // Si no hay usuario autenticado, mostrar login
   if (!appState.currentUser && appState.currentPage !== 'login') {
     appState.currentPage = 'login';
   }
-  
+
   // Si hay usuario autenticado y esta en login, ir a dashboard
   if (appState.currentUser && appState.currentPage === 'login') {
     appState.currentPage = 'dashboard';
   }
-  
+
   let content = '';
-  
+
   switch (appState.currentPage) {
     case 'login':
       content = renderLoginPage();
       break;
     case 'dashboard':
-      content = renderDashboardPage();
+      content = await renderDashboardPage();
       break;
     case 'tickets':
-      content = renderTicketsPage();
+      content = await renderTicketsPage();
       break;
     case 'ticket-detail':
-      content = renderTicketDetailPage();
+      content = await renderTicketDetailPage();
       break;
     case 'clients':
       content = renderClientsPage();
@@ -1596,9 +1599,9 @@ function renderApp() {
       content = renderAlbaranesPage();
       break;
     default:
-      content = renderDashboardPage();
+      content = await renderDashboardPage();
   }
-  
+
   app.innerHTML = content;
 }
 
@@ -1606,12 +1609,12 @@ function renderApp() {
 // Inicializacion
 // ========================================
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function () {
   // Verificar si hay un usuario guardado
   if (checkAuth()) {
     appState.currentPage = 'dashboard';
   }
-  
+
   // Renderizar la aplicacion
-  renderApp();
+  await renderApp();
 });

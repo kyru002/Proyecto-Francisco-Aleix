@@ -2,6 +2,23 @@
 // SERVICORE - Datos y Estado de la Aplicacion
 // ========================================
 
+
+// Configuración API
+const API_URL = 'http://localhost:5001/api';
+
+// Función auxiliar para manejar errores
+async function handleResponse(response) {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.msg || 'Error en la petición');
+  }
+  return response.json();
+}
+
+// ========================================
+// Datos MOCK (Restaurados para compatibilidad)
+// ========================================
+
 // Clientes
 const mockClients = [
   { id: "c1", name: "Acme Corporation", email: "contact@acme.com", company: "Acme Corp", phone: "+1 555-0101", ticketCount: 12, createdAt: "2024-01-15" },
@@ -9,24 +26,6 @@ const mockClients = [
   { id: "c3", name: "Global Solutions", email: "help@globalsol.com", company: "Global Solutions Ltd", phone: "+1 555-0103", ticketCount: 5, createdAt: "2024-03-10" },
   { id: "c4", name: "DataFlow Systems", email: "admin@dataflow.net", company: "DataFlow", phone: "+1 555-0104", ticketCount: 15, createdAt: "2024-01-05" },
   { id: "c5", name: "CloudNine Services", email: "info@cloudnine.co", company: "CloudNine", phone: "+1 555-0105", ticketCount: 3, createdAt: "2024-04-01" },
-];
-
-// Tickets
-let mockTickets = [
-  { id: "t1", title: "Error de conexion al servidor", description: "Los usuarios experimentan errores de timeout frecuentes al conectar al servidor principal de base de datos.", status: "open", priority: "high", clientId: "c1", clientName: "Acme Corporation", assignedTo: "2", assignedToName: "Juan Tecnico", createdAt: "2024-06-01T10:30:00", updatedAt: "2024-06-01T14:20:00" },
-  { id: "t2", title: "Integracion de email no sincroniza", description: "La integracion con Outlook dejo de sincronizar despues de la ultima actualizacion.", status: "in_progress", priority: "medium", clientId: "c2", clientName: "TechStart Inc", assignedTo: "2", assignedToName: "Juan Tecnico", createdAt: "2024-05-28T09:15:00", updatedAt: "2024-06-01T11:00:00" },
-  { id: "t3", title: "Dashboard carga lento", description: "El dashboard principal tarda mas de 15 segundos en cargar para algunos usuarios.", status: "open", priority: "low", clientId: "c3", clientName: "Global Solutions", createdAt: "2024-06-02T08:00:00", updatedAt: "2024-06-02T08:00:00" },
-  { id: "t4", title: "Fallo de autenticacion tras resetear contrasena", description: "Los usuarios no pueden iniciar sesion despues de restablecer sus contrasenas.", status: "closed", priority: "high", clientId: "c4", clientName: "DataFlow Systems", assignedTo: "2", assignedToName: "Juan Tecnico", createdAt: "2024-05-20T16:45:00", updatedAt: "2024-05-25T10:30:00" },
-  { id: "t5", title: "Exportacion de reportes genera PDF vacio", description: "Al exportar reportes mensuales a PDF, el archivo esta vacio.", status: "in_progress", priority: "medium", clientId: "c1", clientName: "Acme Corporation", assignedTo: "2", assignedToName: "Juan Tecnico", createdAt: "2024-05-30T12:00:00", updatedAt: "2024-06-01T09:30:00" },
-  { id: "t6", title: "App movil se cierra al iniciar", description: "La app de iOS se cierra inmediatamente despues de la pantalla de inicio en iPhone 12 y posteriores.", status: "open", priority: "high", clientId: "c5", clientName: "CloudNine Services", createdAt: "2024-06-02T07:30:00", updatedAt: "2024-06-02T07:30:00" },
-];
-
-// Mensajes de chat
-let mockMessages = [
-  { id: "m1", ticketId: "t1", senderId: "c1", senderName: "Acme Corporation", senderRole: "client", content: "Estamos viendo este problema en todas nuestras oficinas. Se esta volviendo critico.", timestamp: "2024-06-01T10:30:00" },
-  { id: "m2", ticketId: "t1", senderId: "2", senderName: "Juan Tecnico", senderRole: "technician", content: "Entiendo la urgencia. Estoy revisando los logs del servidor. Puede confirmar a que cluster de base de datos se conectan?", timestamp: "2024-06-01T10:45:00" },
-  { id: "m3", ticketId: "t1", senderId: "c1", senderName: "Acme Corporation", senderRole: "client", content: "Estamos en el cluster DB-WEST-02. El timeout comenzo alrededor de las 9 AM de hoy.", timestamp: "2024-06-01T11:00:00" },
-  { id: "m4", ticketId: "t1", senderId: "2", senderName: "Juan Tecnico", senderRole: "technician", content: "Lo encontre. Hubo un cambio de configuracion de red que afecto ese cluster. Estoy revirtiendo los cambios ahora.", timestamp: "2024-06-01T14:20:00" },
 ];
 
 // Usuarios del equipo
@@ -37,12 +36,24 @@ let mockTeamUsers = [
   { id: "4", name: "Miguel Ayuda", email: "miguel@support.com", role: "technician", status: "inactive", ticketsAssigned: 0, createdAt: "2024-03-01" },
 ];
 
+// Mensajes de chat
+let mockMessages = [
+  { id: "m1", ticketId: "t1", senderId: "c1", senderName: "Acme Corporation", senderRole: "client", content: "Estamos viendo este problema en todas nuestras oficinas. Se esta volviendo critico.", timestamp: "2024-06-01T10:30:00" },
+  { id: "m2", ticketId: "t1", senderId: "2", senderName: "Juan Tecnico", senderRole: "technician", content: "Entiendo la urgencia. Estoy revisando los logs del servidor. Puede confirmar a que cluster de base de datos se conectan?", timestamp: "2024-06-01T10:45:00" },
+  { id: "m3", ticketId: "t1", senderId: "c1", senderName: "Acme Corporation", senderRole: "client", content: "Estamos en el cluster DB-WEST-02. El timeout comenzo alrededor de las 9 AM de hoy.", timestamp: "2024-06-01T11:00:00" },
+  { id: "m4", ticketId: "t1", senderId: "2", senderName: "Juan Tecnico", senderRole: "technician", content: "Lo encontre. Hubo un cambio de configuracion de red que afecto ese cluster. Estoy revirtiendo los cambios ahora.", timestamp: "2024-06-01T14:20:00" },
+];
+
 // Albaranes (Notas de entrega)
 let mockDeliveryNotes = [
   { id: "dn1", ticketId: "t4", ticketTitle: "Fallo de autenticacion tras resetear contrasena", clientId: "c4", clientName: "DataFlow Systems", technicianId: "2", technicianName: "Juan Tecnico", hoursWorked: 3.5, description: "Se corrigio el flujo de autenticacion actualizando la validacion del token de restablecimiento de contrasena. Probado en todos los navegadores principales.", createdAt: "2024-05-25T10:30:00" },
 ];
 
-// Credenciales de usuarios para login
+// ========================================
+// Autenticacion y Estado (MOCK)
+// ========================================
+
+// Credenciales de usuarios para login (Simulación)
 const userCredentials = [
   { email: "admin@support.com", password: "admin123", id: "1", name: "Admin Usuario", role: "admin" },
   { email: "tech@support.com", password: "tech123", id: "2", name: "Juan Tecnico", role: "technician" },
@@ -56,27 +67,25 @@ let appState = {
   currentUser: null,
   currentPage: 'login',
   sidebarOpen: false,
+  tickets: [], // Almacenar tickets cargados
 };
 
-// Función navigateTo
+// Función navigateTo (será sobreescrita por app.js pero necesaria para evitar undefined en data.js)
 function navigateTo(page) {
   appState.currentPage = page;
 }
 
-// ========================================
-// Funciones de Autenticacion
-// ========================================
-
+// Funciones de Auth
 function login(email, password) {
   const user = userCredentials.find(
     (u) => u.email === email && u.password === password
   );
-  
+
   if (user) {
     appState.currentUser = { ...user };
     delete appState.currentUser.password;
     localStorage.setItem('currentUser', JSON.stringify(appState.currentUser));
-    navigateTo('dashboard'); // Redirect to dashboard after login
+    // Redireccion handled in app.js or here
     return true;
   }
   return false;
@@ -85,7 +94,7 @@ function login(email, password) {
 function logout() {
   appState.currentUser = null;
   localStorage.removeItem('currentUser');
-  navigateTo('login');
+  if (typeof navigateTo === 'function') navigateTo('login');
 }
 
 function checkAuth() {
@@ -110,52 +119,101 @@ function isClient() {
 }
 
 // ========================================
-// Funciones CRUD para Tickets
+// Funciones CRUD para Tickets (CONECTADO A BD)
 // ========================================
 
+async function fetchTickets() {
+  try {
+    const response = await fetch(`${API_URL}/tickets`);
+    const tickets = await handleResponse(response);
+
+    // Adaptar formato de ID de Mongo (_id) al formato que usa el front (id)
+    const mappedTickets = tickets.map(t => ({
+      ...t,
+      id: t._id, // Mapear _id a id
+      clientName: t.client || 'Cliente', // Ajuste temporal
+      clientId: 'c1', // Hardcodeado temporalmente
+      assignedToName: t.technician || 'Sin asignar'
+    }));
+
+    appState.tickets = mappedTickets;
+    return mappedTickets;
+  } catch (error) {
+    console.error("Error fetching tickets:", error);
+    return [];
+  }
+}
+
+// Reemplazar legacy getTickets para que use el cache de appState
 function getTickets() {
-  if (isClient() && appState.currentUser?.companyId) {
-    return mockTickets.filter(t => t.clientId === appState.currentUser.companyId);
+  return appState.tickets || [];
+}
+
+async function fetchTicketById(id) {
+  const tickets = await fetchTickets();
+  return tickets.find(t => t.id === id);
+}
+
+async function createTicket(ticketData) {
+  try {
+    const response = await fetch(`${API_URL}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: ticketData.title,
+        description: ticketData.description,
+        client: ticketData.clientName || "Cliente Web",
+        priority: ticketData.priority,
+        status: ticketData.status || 'abierto',
+        technician: ticketData.assignedToName
+      })
+    });
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error creating ticket:", error);
+    throw error;
   }
-  return mockTickets;
 }
 
-function getTicketById(id) {
-  return mockTickets.find(t => t.id === id);
-}
-
-function addTicket(ticketData) {
-  const newTicket = {
-    id: 't' + Date.now(),
-    ...ticketData,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  mockTickets.unshift(newTicket);
-  return newTicket;
-}
-
-function updateTicket(id, updates) {
-  const index = mockTickets.findIndex(t => t.id === id);
-  if (index !== -1) {
-    mockTickets[index] = {
-      ...mockTickets[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    return mockTickets[index];
+async function updateTicketAPI(id, updates) {
+  try {
+    const response = await fetch(`${API_URL}/tickets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...updates,
+        status: updates.status, // Asegurar que status se envía
+        priority: updates.priority
+      })
+    });
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error updating ticket:", error);
+    throw error;
   }
-  return null;
 }
 
-function deleteTicket(id) {
-  const index = mockTickets.findIndex(t => t.id === id);
-  if (index !== -1) {
-    mockTickets.splice(index, 1);
-    return true;
+async function deleteTicketAPI(id) {
+  try {
+    const response = await fetch(`${API_URL}/tickets/${id}`, {
+      method: 'DELETE'
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error deleting ticket:", error);
+    return false;
   }
-  return false;
 }
+
+// ========================================
+// Funciones Legacy (Adaptadores temporales)
+// ========================================
+// Estas funciones se mantienen para evitar errores mientras migramos app.js
+function getTickets() { return []; }
+function getTicketById(id) { return null; }
+function addTicket(data) { console.warn("Use createTicket instead"); }
+function updateTicket(id, data) { console.warn("Use updateTicketAPI instead"); }
+function deleteTicket(id) { console.warn("Use deleteTicketAPI instead"); }
 
 // ========================================
 // Funciones CRUD para Usuarios del Equipo
@@ -260,10 +318,10 @@ function getStats() {
   const tickets = getTickets();
   return {
     total: tickets.length,
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    closed: tickets.filter(t => t.status === 'closed').length,
-    highPriority: tickets.filter(t => t.priority === 'high' && t.status !== 'closed').length,
+    open: tickets.filter(t => t.status === 'abierto' || t.status === 'open').length,
+    inProgress: tickets.filter(t => t.status === 'en progreso' || t.status === 'in_progress').length,
+    closed: tickets.filter(t => t.status === 'cerrado' || t.status === 'closed').length,
+    highPriority: tickets.filter(t => (t.priority === 'alta' || t.priority === 'high') && (t.status !== 'cerrado' && t.status !== 'closed')).length,
     clients: mockClients.length,
   };
 }
