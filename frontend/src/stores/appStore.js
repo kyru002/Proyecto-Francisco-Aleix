@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
-import { ticketsService, tecnicosService, clientesService } from '../services/api';
+import { ticketsService, tecnicosService, clientesService, albaranesService } from '../services/api';
 
 export const useAppStore = defineStore('app', {
     state: () => ({
         tickets: [],
         tecnicos: [],
         clientes: [],
+        albaranes: [],
         loading: false,
         currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
     }),
@@ -18,6 +19,7 @@ export const useAppStore = defineStore('app', {
                     ticketsService.getAll(),
                     tecnicosService.getAll(),
                     clientesService.getAll(),
+                    albaranesService.getAll(),
                 ]);
 
                 if (results[0].status === 'fulfilled') this.tickets = results[0].value;
@@ -28,6 +30,9 @@ export const useAppStore = defineStore('app', {
 
                 if (results[2].status === 'fulfilled') this.clientes = results[2].value;
                 else console.error('Error fetching clientes:', results[2].reason);
+
+                if (results[3].status === 'fulfilled') this.albaranes = results[3].value;
+                else console.error('Error fetching albaranes:', results[3].reason);
 
             } catch (error) {
                 console.error('Unexpected error in fetchAll:', error);
@@ -49,6 +54,75 @@ export const useAppStore = defineStore('app', {
             const newCliente = await clientesService.create(data);
             this.clientes.unshift(newCliente);
             return newCliente;
+        },
+        async updateCliente(id, data) {
+            const updatedCliente = await clientesService.update(id, data);
+            const index = this.clientes.findIndex(c => c.id === id);
+            if (index !== -1) {
+                this.clientes[index] = updatedCliente;
+            }
+            return updatedCliente;
+        },
+        async deleteCliente(id) {
+            await clientesService.delete(id);
+            this.clientes = this.clientes.filter(c => c.id !== id);
+        },
+        async updateTecnico(id, data) {
+            const updatedTecnico = await tecnicosService.update(id, data);
+            const index = this.tecnicos.findIndex(t => t.id === id);
+            if (index !== -1) {
+                this.tecnicos[index] = updatedTecnico;
+            }
+            return updatedTecnico;
+        },
+        async deleteTecnico(id) {
+            await tecnicosService.delete(id);
+            this.tecnicos = this.tecnicos.filter(t => t.id !== id);
+        },
+        async updateTicket(id, data) {
+            const updatedTicket = await ticketsService.update(id, data);
+            const index = this.tickets.findIndex(t => t.id === id);
+            if (index !== -1) {
+                this.tickets[index] = updatedTicket;
+            }
+            return updatedTicket;
+        },
+        async deleteTicket(id) {
+            await ticketsService.delete(id);
+            this.tickets = this.tickets.filter(t => t.id !== id);
+        },
+        async createAlbarani(data) {
+            const nuevoAlbarani = await albaranesService.create(data);
+            this.albaranes.unshift(nuevoAlbarani);
+            return nuevoAlbarani;
+        },
+        async updateAlbarani(id, data) {
+            const updatedAlbarani = await albaranesService.update(id, data);
+            const index = this.albaranes.findIndex(a => a.id === id);
+            if (index !== -1) {
+                this.albaranes[index] = updatedAlbarani;
+            }
+            return updatedAlbarani;
+        },
+        async deleteAlbarani(id) {
+            await albaranesService.delete(id);
+            this.albaranes = this.albaranes.filter(a => a.id !== id);
+        },
+        async cambiarEstadoAlbarani(id, estado) {
+            const updatedAlbarani = await albaranesService.cambiarEstado(id, estado);
+            const index = this.albaranes.findIndex(a => a.id === id);
+            if (index !== -1) {
+                this.albaranes[index] = updatedAlbarani;
+            }
+            return updatedAlbarani;
+        },
+        async entregarAlbarani(id, firmante) {
+            const updatedAlbarani = await albaranesService.entregar(id, firmante);
+            const index = this.albaranes.findIndex(a => a.id === id);
+            if (index !== -1) {
+                this.albaranes[index] = updatedAlbarani;
+            }
+            return updatedAlbarani;
         },
         logout() {
             this.currentUser = null;

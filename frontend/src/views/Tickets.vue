@@ -8,7 +8,8 @@ import {
   MoreVertical,
   MessageSquare,
   Clock,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-vue-next';
 
 const store = useAppStore();
@@ -25,6 +26,12 @@ onMounted(async () => {
   await store.fetchAll();
 });
 
+const editingTicket = ref(null);
+const showEditModal = ref(false);
+const searchQuery = ref('');
+const filterStatus = ref('');
+const filterPriority = ref('');
+
 const handleCreateTicket = async () => {
   try {
     await store.createTicket(newTicket.value);
@@ -33,6 +40,35 @@ const handleCreateTicket = async () => {
   } catch (error) {
     alert('Error al crear el ticket');
   }
+};
+
+const handleEditTicket = (ticket) => {
+  editingTicket.value = { ...ticket };
+  showEditModal.value = true;
+};
+
+const handleSaveEdit = async () => {
+  try {
+    await store.updateTicket(editingTicket.value._id, editingTicket.value);
+    showEditModal.value = false;
+    editingTicket.value = null;
+  } catch (error) {
+    alert('Error al actualizar el ticket');
+  }
+};
+
+const handleDeleteTicket = async (ticketId) => {
+  if (confirm('¿Estás seguro de que quieres eliminar este ticket?')) {
+    try {
+      await store.deleteTicket(ticketId);
+    } catch (error) {
+      alert('Error al eliminar el ticket');
+    }
+  }
+};
+
+const handleViewTicket = (ticket) => {
+  console.log('Ver ticket:', ticket);
 };
 </script>
 
@@ -54,15 +90,15 @@ const handleCreateTicket = async () => {
       <div class="filters-bar">
         <div class="input-with-icon" style="flex: 1;">
           <Search />
-          <input type="text" class="form-input" placeholder="Buscar por título, ID o cliente...">
+          <input v-model="searchQuery" type="text" class="form-input" placeholder="Buscar por título, ID o cliente...">
         </div>
-        <select class="form-input form-select">
+        <select v-model="filterStatus" class="form-input form-select">
           <option value="">Todos los estados</option>
           <option value="abierto">Abierto</option>
           <option value="en progreso">En Progreso</option>
           <option value="cerrado">Cerrado</option>
         </select>
-        <select class="form-input form-select">
+        <select v-model="filterPriority" class="form-input form-select">
           <option value="">Cualquier prioridad</option>
           <option value="alta">Alta</option>
           <option value="media">Media</option>
@@ -73,20 +109,20 @@ const handleCreateTicket = async () => {
 
     <!-- Lista de Tickets -->
     <div v-if="store.tickets.length === 0" class="empty-state">
-      <Ticket style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
+      <FileText style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
       <p>No se encontraron tickets con los filtros actuales.</p>
     </div>
 
     <div v-else class="card" style="padding: 1rem;">
-      <div v-for="ticket in store.tickets" :key="ticket.id" class="ticket-list-item">
+      <div v-for="ticket in store.tickets" :key="ticket._id" class="ticket-list-item">
         <div class="ticket-info">
           <div class="ticket-title">{{ ticket.title }}</div>
           <div class="ticket-meta">
-            <span>#{{ ticket.id.slice(-6).toUpperCase() }}</span> • 
+            <span>#{{ ticket._id ? ticket._id.slice(-6).toUpperCase() : 'N/A' }}</span> • 
             <span>{{ ticket.client }}</span> • 
             <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
               <Clock style="width: 12px; height: 12px;" />
-              {{ new Date(ticket.createdAt).toLocaleDateString() }}
+              {{ ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A' }}
             </span>
           </div>
         </div>
@@ -106,11 +142,71 @@ const handleCreateTicket = async () => {
               <MessageSquare style="width: 14px; height: 14px;" />
               {{ ticket.messages?.length || 0 }}
             </div>
-            <button class="btn btn-ghost btn-icon">
+            <button @click="handleEditTicket(ticket)" class="btn btn-secondary btn-icon" title="Editar">
+              <MessageSquare style="width: 14px; height: 14px;" />
+            </button>
+            <button @click="handleViewTicket(ticket)" class="btn btn-ghost btn-icon" title="Ver detalles">
               <ExternalLink />
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div v-if="showEditModal" class="modal-overlay">
+      <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Editar Ticket</h2>
+        </div>
+        <form @submit.prevent="handleSaveEdit" v-if="editingTicket">
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Título del Problema</label>
+              <input v-model="editingTicket.title" type="text" class="form-input" required placeholder="Ej: No puedo acceder al correo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cliente / Empresa</label>
+              <select v-model="editingTicket.client" class="form-input form-select" required>
+                <option value="" disabled>Seleccionar cliente</option>
+                <option v-for="c in store.clientes" :key="c.id" :value="c.company || c.nombreEmpresa">{{ c.company || c.nombreEmpresa }} ({{ c.name || c.nombreContacto }})</option>
+              </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label">Prioridad</label>
+                <select v-model="editingTicket.priority" class="form-input form-select">
+                  <option value="baja">Baja</option>
+                  <option value="media">Media</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Estado</label>
+                <select v-model="editingTicket.status" class="form-input form-select">
+                  <option value="abierto">Abierto</option>
+                  <option value="en progreso">En Progreso</option>
+                  <option value="cerrado">Cerrado</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Asignar a Técnico</label>
+              <select v-model="editingTicket.technician" class="form-input form-select">
+                <option value="">Sin asignar</option>
+                <option v-for="t in store.tecnicos" :key="t.id" :value="t.name || t.nombre">{{ t.name || t.nombre }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Descripción Detallada</label>
+              <textarea v-model="editingTicket.description" class="form-input form-textarea" required placeholder="Describe el problema con el mayor detalle posible..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="showEditModal = false" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+          </div>
+        </form>
       </div>
     </div>
 

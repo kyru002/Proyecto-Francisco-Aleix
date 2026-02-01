@@ -26,6 +26,9 @@ onMounted(async () => {
   await store.fetchAll();
 });
 
+const editingClient = ref(null);
+const showEditModal = ref(false);
+
 const handleCreateClient = async () => {
   try {
     await store.createCliente(newClient.value);
@@ -33,6 +36,35 @@ const handleCreateClient = async () => {
     newClient.value = { nombreContacto: '', nombreEmpresa: '', email: '', telefono: '' };
   } catch (error) {
     alert('Error al crear el cliente');
+  }
+};
+
+const handleEditClient = (client) => {
+  editingClient.value = { ...client };
+  showEditModal.value = true;
+};
+
+const handleSaveEdit = async () => {
+  try {
+    await store.updateCliente(editingClient.value.id, editingClient.value);
+    showEditModal.value = false;
+    editingClient.value = null;
+  } catch (error) {
+    alert('Error al actualizar el cliente');
+  }
+};
+
+const handleViewClient = (client) => {
+  console.log('Ver cliente:', client);
+};
+
+const handleDeleteClient = async (clientId) => {
+  if (confirm('¿Estás seguro de que quieres eliminar este cliente?')) {
+    try {
+      await store.deleteCliente(clientId);
+    } catch (error) {
+      alert('Error al eliminar el cliente');
+    }
   }
 };
 </script>
@@ -95,13 +127,49 @@ const handleCreateClient = async () => {
         </div>
 
         <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-          <button class="btn btn-secondary btn-icon" title="Editar">
+          <button @click="handleEditClient(client)" class="btn btn-secondary btn-icon" title="Editar">
             <Edit />
           </button>
-          <button class="btn btn-ghost btn-icon" style="margin-left: auto;">
+          <button @click="handleDeleteClient(client.id)" class="btn btn-ghost btn-icon" title="Eliminar">
+            <Trash2 />
+          </button>
+          <button @click="handleViewClient(client)" class="btn btn-ghost btn-icon" style="margin-left: auto;" title="Ver detalles">
             <ExternalLink />
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div v-if="showEditModal" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Editar Cliente</h2>
+        </div>
+        <form @submit.prevent="handleSaveEdit" v-if="editingClient">
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Nombre de Contacto</label>
+              <input v-model="editingClient.nombreContacto" type="text" class="form-input" required placeholder="Ej: Juan Pérez">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombre de la Empresa</label>
+              <input v-model="editingClient.nombreEmpresa" type="text" class="form-input" required placeholder="Ej: Acme Corp">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo Electrónico</label>
+              <input v-model="editingClient.email" type="email" class="form-input" required placeholder="correo@empresa.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input v-model="editingClient.telefono" type="tel" class="form-input" placeholder="+34 600 000 000">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="showEditModal = false" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+          </div>
+        </form>
       </div>
     </div>
 

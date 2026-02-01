@@ -31,4 +31,17 @@ export const clientesService = {
     delete: (id) => api.delete(`/clientes/${id}`).then(res => res.data),
 };
 
+export const albaranesService = {
+    getAll: () => api.get('/albaranes').then(res => res.data),
+    getById: (id) => api.get(`/albaranes/${id}`).then(res => res.data),
+    getByCliente: (clienteId) => api.get(`/albaranes/cliente/${clienteId}`).then(res => res.data),
+    getByEstado: (estado) => api.get(`/albaranes/estado/${estado}`).then(res => res.data),
+    create: (data) => api.post('/albaranes', data).then(res => res.data),
+    update: (id, data) => api.put(`/albaranes/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/albaranes/${id}`).then(res => res.data),
+    cambiarEstado: (id, estado) => api.patch(`/albaranes/${id}/estado`, { estado }).then(res => res.data),
+    entregar: (id, firmante) => api.patch(`/albaranes/${id}/entregar`, { firmante }).then(res => res.data),
+    obtenerProximoNumero: () => api.get('/albaranes/numero/siguiente').then(res => res.data),
+};
+
 export default api;

@@ -7,6 +7,7 @@ import {
   Ticket, 
   Users, 
   LogOut,
+  FileText,
   ChevronRight,
   Plus
 } from 'lucide-vue-next';
@@ -18,6 +19,7 @@ const store = useAppStore();
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Tickets', path: '/tickets', icon: Ticket },
+  { name: 'Albaranes', path: '/albaranes', icon: FileText },
   { name: 'Equipo', path: '/technicians', icon: Users },
   { name: 'Clientes', path: '/clients', icon: Users },
 ];

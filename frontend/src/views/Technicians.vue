@@ -24,6 +24,10 @@ onMounted(async () => {
   await store.fetchAll();
 });
 
+const editingTecnico = ref(null);
+const showEditModal = ref(false);
+const showMenuId = ref(null);
+
 const handleCreateTecnico = async () => {
   try {
     await store.createTecnico(newTecnico.value);
@@ -32,6 +36,37 @@ const handleCreateTecnico = async () => {
   } catch (error) {
     alert('Error al crear el técnico');
   }
+};
+
+const handleEditTecnico = (tecnico) => {
+  editingTecnico.value = { ...tecnico };
+  showEditModal.value = true;
+  showMenuId.value = null;
+};
+
+const handleSaveEdit = async () => {
+  try {
+    await store.updateTecnico(editingTecnico.value.id, editingTecnico.value);
+    showEditModal.value = false;
+    editingTecnico.value = null;
+  } catch (error) {
+    alert('Error al actualizar el técnico');
+  }
+};
+
+const handleDeleteTecnico = async (tecnicoId) => {
+  if (confirm('¿Estás seguro de que quieres eliminar este técnico?')) {
+    try {
+      await store.deleteTecnico(tecnicoId);
+      showMenuId.value = null;
+    } catch (error) {
+      alert('Error al eliminar el técnico');
+    }
+  }
+};
+
+const toggleMenu = (tecnicoId) => {
+  showMenuId.value = showMenuId.value === tecnicoId ? null : tecnicoId;
 };
 </script>
 
@@ -85,13 +120,62 @@ const handleCreateTecnico = async () => {
               </td>
               <td>{{ tecnico.ticketsAssigned || 0 }}</td>
               <td>
-                <button class="btn btn-ghost btn-icon">
-                  <MoreVertical />
-                </button>
+                <div style="position: relative;">
+                  <button @click="toggleMenu(tecnico.id)" class="btn btn-ghost btn-icon">
+                    <MoreVertical />
+                  </button>
+                  <div v-if="showMenuId === tecnico.id" style="position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; min-width: 150px;">
+                    <button @click="handleEditTecnico(tecnico)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem;" type="button">
+                      Editar
+                    </button>
+                    <button @click="handleDeleteTecnico(tecnico.id)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--destructive);" type="button">
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div v-if="showEditModal" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Editar Miembro del Equipo</h2>
+        </div>
+        <form @submit.prevent="handleSaveEdit" v-if="editingTecnico">
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Nombre Completo</label>
+              <input v-model="editingTecnico.nombre" type="text" class="form-input" required placeholder="Ej: Carlos Soporte">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo Electrónico</label>
+              <input v-model="editingTecnico.email" type="email" class="form-input" required placeholder="carlos@support.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rol del Usuario</label>
+              <select v-model="editingTecnico.role" class="form-input form-select" required>
+                <option value="technician">Técnico</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select v-model="editingTecnico.estado" class="form-input form-select" required>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="showEditModal = false" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+          </div>
+        </form>
       </div>
     </div>
 

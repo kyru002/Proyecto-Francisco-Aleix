@@ -14,6 +14,7 @@ app.use(express.json());
 app.use("/api/tickets", require("./routes/tickets"));
 app.use("/api/tecnicos", require("./routes/tecnicos"));
 app.use("/api/clientes", require("./routes/clientes"));
+app.use("/api/albaranes", require("./routes/albaranes"));
 
 // Ruta inicial se mantiene para verificar estado
 app.get("/", (req, res) => {
