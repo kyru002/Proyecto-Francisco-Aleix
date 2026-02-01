@@ -21,6 +21,7 @@ const showMenuId = ref(null);
 const editingAlbarani = ref(null);
 const searchQuery = ref('');
 const filterEstado = ref('');
+const filterTecnico = ref('');
 
 const newAlbarani = ref({
   numeroAlbaran: '',
@@ -95,7 +96,8 @@ const albaranesFiltered = computed(() => {
     const matchesSearch = albarani.numeroAlbaran.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
                           (albarani.cliente?.nombreEmpresa || '').toLowerCase().includes(searchQuery.value.toLowerCase());
     const matchesEstado = !filterEstado.value || albarani.estado === filterEstado.value;
-    return matchesSearch && matchesEstado;
+    const matchesTecnico = !filterTecnico.value || albarani.tecnico?._id === filterTecnico.value;
+    return matchesSearch && matchesEstado && matchesTecnico;
   });
 });
 
@@ -298,6 +300,10 @@ const getEstadoColor = (estado) => {
           <option value="devuelto">Devuelto</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <select v-model="filterTecnico" class="form-input form-select">
+          <option value="">Todos los técnicos</option>
+          <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre }}</option>
+        </select>
       </div>
     </div>
 
@@ -309,7 +315,7 @@ const getEstadoColor = (estado) => {
 
     <div v-else class="card" style="padding: 1rem;">
       <div v-for="albarani in albaranesFiltered" :key="albarani._id" style="padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 100px; gap: 1rem; align-items: center;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 100px; gap: 1rem; align-items: center;">
           <!-- Número de Albarán -->
           <div>
             <div style="font-weight: 600; font-size: 0.95rem;">{{ albarani.numeroAlbaran }}</div>
@@ -320,6 +326,12 @@ const getEstadoColor = (estado) => {
           <div>
             <div style="font-size: 0.875rem; font-weight: 500;">{{ albarani.cliente?.nombreEmpresa || 'N/A' }}</div>
             <div style="font-size: 0.75rem; color: var(--muted-foreground);">{{ albarani.cliente?.nombreContacto || '' }}</div>
+          </div>
+
+          <!-- Técnico -->
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 500;">{{ albarani.tecnico?.nombre || 'Sin técnico' }}</div>
+            <div style="font-size: 0.75rem; color: var(--muted-foreground);">Técnico</div>
           </div>
 
           <!-- Importe Total -->

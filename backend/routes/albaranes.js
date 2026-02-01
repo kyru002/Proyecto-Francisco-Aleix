@@ -160,8 +160,8 @@ router.post("/", async (req, res) => {
         const nuevoAlbarani = new Albarani({
             numeroAlbaran: numeroAlbaran.trim(),
             cliente,
-            tecnico: tecnico && tecnico !== null ? tecnico : null,
-            ticket: ticket && ticket !== null ? ticket : null,
+            tecnico: tecnico && tecnico.toString().trim() !== '' ? tecnico : null,
+            ticket: ticket && ticket.toString().trim() !== '' ? ticket : null,
             descripcion: descripcion || '',
             lineas: lineas.map(linea => ({
                 concepto: linea.concepto.toString().trim(),
@@ -216,7 +216,7 @@ router.put("/:id", async (req, res) => {
         const actualizacion = {
             numeroAlbaran,
             cliente,
-            tecnico,
+            tecnico: tecnico && tecnico.toString().trim() !== '' ? tecnico : null,
             estado,
             descripcion,
             lineas,
