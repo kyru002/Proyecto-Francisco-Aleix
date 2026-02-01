@@ -20,21 +20,10 @@ async function handleResponse(response) {
 // ========================================
 
 // Clientes
-const mockClients = [
-  { id: "c1", name: "Acme Corporation", email: "contact@acme.com", company: "Acme Corp", phone: "+1 555-0101", ticketCount: 12, createdAt: "2024-01-15" },
-  { id: "c2", name: "TechStart Inc", email: "support@techstart.io", company: "TechStart", phone: "+1 555-0102", ticketCount: 8, createdAt: "2024-02-20" },
-  { id: "c3", name: "Global Solutions", email: "help@globalsol.com", company: "Global Solutions Ltd", phone: "+1 555-0103", ticketCount: 5, createdAt: "2024-03-10" },
-  { id: "c4", name: "DataFlow Systems", email: "admin@dataflow.net", company: "DataFlow", phone: "+1 555-0104", ticketCount: 15, createdAt: "2024-01-05" },
-  { id: "c5", name: "CloudNine Services", email: "info@cloudnine.co", company: "CloudNine", phone: "+1 555-0105", ticketCount: 3, createdAt: "2024-04-01" },
-];
+let mockClients = [];
 
 // Usuarios del equipo
-let mockTeamUsers = [
-  { id: "1", name: "Admin Usuario", email: "admin@support.com", role: "admin", status: "active", ticketsAssigned: 0, createdAt: "2024-01-01" },
-  { id: "2", name: "Juan Tecnico", email: "tech@support.com", role: "technician", status: "active", ticketsAssigned: 4, createdAt: "2024-01-15" },
-  { id: "3", name: "Sara Soporte", email: "sara@support.com", role: "technician", status: "active", ticketsAssigned: 6, createdAt: "2024-02-01" },
-  { id: "4", name: "Miguel Ayuda", email: "miguel@support.com", role: "technician", status: "inactive", ticketsAssigned: 0, createdAt: "2024-03-01" },
-];
+let mockTeamUsers = [];
 
 // Mensajes de chat
 let mockMessages = [
@@ -205,70 +194,149 @@ async function deleteTicketAPI(id) {
   }
 }
 
-// ========================================
-// Funciones Legacy (Adaptadores temporales)
-// ========================================
-// Estas funciones se mantienen para evitar errores mientras migramos app.js
-function getTickets() { return []; }
-function getTicketById(id) { return null; }
-function addTicket(data) { console.warn("Use createTicket instead"); }
-function updateTicket(id, data) { console.warn("Use updateTicketAPI instead"); }
-function deleteTicket(id) { console.warn("Use deleteTicketAPI instead"); }
+// Redundancia eliminada - El frontend ahora usa fetchTickets, createTicket, etc.
 
 // ========================================
 // Funciones CRUD para Usuarios del Equipo
 // ========================================
 
+async function fetchTeamUsers() {
+  try {
+    const response = await fetch(`${API_URL}/tecnicos`);
+    const technicians = await handleResponse(response);
+
+    // Adaptar formato
+    const mapped = technicians.map(t => ({
+      id: t._id,
+      name: t.nombre,
+      email: t.email,
+      role: t.role || "technician",
+      status: t.estado === "activo" ? "active" : "inactive",
+      ticketsAssigned: t.totalTickets || 0,
+      createdAt: t.fechaIncorporacion || t.createdAt
+    }));
+
+    mockTeamUsers = mapped; // Actualizar cache local
+    return mapped;
+  } catch (error) {
+    console.error("Error fetching technicians:", error);
+    return mockTeamUsers; // Fallback a mock
+  }
+}
+
 function getTeamUsers() {
   return mockTeamUsers;
 }
 
-function addTeamUser(userData) {
-  const newUser = {
-    id: Date.now().toString(),
-    ...userData,
-    ticketsAssigned: 0,
-    createdAt: new Date().toISOString().split('T')[0],
-  };
-  mockTeamUsers.push(newUser);
-  return newUser;
+async function addTeamUser(userData) {
+  try {
+    const response = await fetch(`${API_URL}/tecnicos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: userData.name,
+        email: userData.email,
+        role: userData.role,
+        estado: userData.status === "active" ? "activo" : "inactivo"
+      })
+    });
+    const saved = await handleResponse(response);
+    await fetchTeamUsers(); // Recargar lista
+    return saved;
+  } catch (error) {
+    console.error("Error adding technician:", error);
+    throw error;
+  }
 }
 
-function updateTeamUser(id, updates) {
-  const index = mockTeamUsers.findIndex(u => u.id === id);
-  if (index !== -1) {
-    mockTeamUsers[index] = { ...mockTeamUsers[index], ...updates };
-    return mockTeamUsers[index];
+async function updateTeamUser(id, updates) {
+  try {
+    const response = await fetch(`${API_URL}/tecnicos/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: updates.name,
+        email: updates.email,
+        role: updates.role,
+        estado: updates.status === "active" ? "activo" : "inactivo"
+      })
+    });
+    const updated = await handleResponse(response);
+    await fetchTeamUsers();
+    return updated;
+  } catch (error) {
+    console.error("Error updating technician:", error);
+    throw error;
   }
-  return null;
 }
 
-function deleteTeamUser(id) {
-  const index = mockTeamUsers.findIndex(u => u.id === id);
-  if (index !== -1) {
-    mockTeamUsers.splice(index, 1);
-    return true;
+async function deleteTeamUser(id) {
+  try {
+    const response = await fetch(`${API_URL}/tecnicos/${id}`, {
+      method: 'DELETE'
+    });
+    if (response.ok) {
+      await fetchTeamUsers();
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error deleting technician:", error);
+    return false;
   }
-  return false;
 }
 
 // ========================================
 // Funciones CRUD para Clientes
 // ========================================
 
+async function fetchClients() {
+  try {
+    const response = await fetch(`${API_URL}/clientes`);
+    const clientes = await handleResponse(response);
+
+    // Adaptar formato
+    const mapped = clientes.map(c => ({
+      id: c._id,
+      name: c.nombreContacto,
+      company: c.nombreEmpresa,
+      email: c.email,
+      phone: c.telefono,
+      ticketCount: 0, // Esto se podría calcular en el server
+      createdAt: c.createdAt
+    }));
+
+    mockClients = mapped;
+    return mapped;
+  } catch (error) {
+    console.error("Error fetching clients:", error);
+    return mockClients;
+  }
+}
+
 function getClients() {
   return mockClients;
 }
 
-function addClient(clientData) {
-  const newClient = {
-    id: 'c' + Date.now(),
-    ...clientData,
-    ticketCount: 0,
-    createdAt: new Date().toISOString().split('T')[0],
-  };
-  mockClients.push(newClient);
-  return newClient;
+async function addClient(clientData) {
+  try {
+    const response = await fetch(`${API_URL}/clientes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombreContacto: clientData.name,
+        nombreEmpresa: clientData.company,
+        email: clientData.email,
+        telefono: clientData.phone
+      })
+    });
+    const saved = await handleResponse(response);
+    await fetchClients();
+    return saved;
+  } catch (error) {
+    console.error("Error adding client:", error);
+    throw error;
+  }
 }
 
 // ========================================

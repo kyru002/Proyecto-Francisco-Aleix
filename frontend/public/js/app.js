@@ -386,7 +386,7 @@ async function renderDashboardPage() {
 
 async function renderTicketsPage() {
   const tickets = await fetchTickets();
-  const clients = getClients();
+  const clients = await fetchClients();
   const technicians = getTeamUsers().filter(u => u.role === 'technician' && u.status === 'active');
 
   return `
@@ -940,8 +940,8 @@ function sendMessage(ticketId) {
 // Pagina de Clientes
 // ========================================
 
-function renderClientsPage() {
-  const clients = getClients();
+async function renderClientsPage() {
+  const clients = await fetchClients();
 
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
@@ -1058,10 +1058,10 @@ function filterClients() {
   }
 }
 
-function handleCreateClient(event) {
+async function handleCreateClient(event) {
   event.preventDefault();
 
-  addClient({
+  await addClient({
     name: document.getElementById('clientName').value,
     company: document.getElementById('clientCompany').value,
     email: document.getElementById('clientEmail').value,
@@ -1069,14 +1069,14 @@ function handleCreateClient(event) {
   });
 
   closeModal('createClientModal');
-  navigateTo('clients');
+  await navigateTo('clients');
 }
 
 // ========================================
 // Pagina de Usuarios/Equipo
 // ========================================
 
-function renderUsersPage() {
+async function renderUsersPage() {
   if (!isAdmin()) {
     return `
       <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
@@ -1091,7 +1091,7 @@ function renderUsersPage() {
     `;
   }
 
-  const teamUsers = getTeamUsers();
+  const teamUsers = await fetchTeamUsers();
 
   return `
     <button class="mobile-menu-btn" onclick="toggleSidebar()">${icons.menu}</button>
@@ -1299,10 +1299,10 @@ function filterUsers() {
   }
 }
 
-function handleCreateUser(event) {
+async function handleCreateUser(event) {
   event.preventDefault();
 
-  addTeamUser({
+  await addTeamUser({
     name: document.getElementById('userName').value,
     email: document.getElementById('userEmail').value,
     role: document.getElementById('userRole').value,
@@ -1327,10 +1327,10 @@ function openEditUserModal(userId) {
   openModal('editUserModal');
 }
 
-function handleEditUser(event) {
+async function handleEditUser(event) {
   event.preventDefault();
 
-  updateTeamUser(document.getElementById('editUserId').value, {
+  await updateTeamUser(document.getElementById('editUserId').value, {
     name: document.getElementById('editUserName').value,
     email: document.getElementById('editUserEmail').value,
     role: document.getElementById('editUserRole').value,
@@ -1341,10 +1341,10 @@ function handleEditUser(event) {
   navigateTo('users');
 }
 
-function toggleUserStatus(userId) {
+async function toggleUserStatus(userId) {
   const user = getTeamUsers().find(u => u.id === userId);
   if (user) {
-    updateTeamUser(userId, {
+    await updateTeamUser(userId, {
       status: user.status === 'active' ? 'inactive' : 'active',
     });
     closeAllDropdowns();
@@ -1358,9 +1358,9 @@ function openDeleteUserModal(userId) {
   openModal('deleteUserModal');
 }
 
-function handleDeleteUser() {
+async function handleDeleteUser() {
   const id = document.getElementById('deleteUserId').value;
-  deleteTeamUser(id);
+  await deleteTeamUser(id);
   closeModal('deleteUserModal');
   navigateTo('users');
 }
@@ -1590,10 +1590,10 @@ async function renderApp() {
       content = await renderTicketDetailPage();
       break;
     case 'clients':
-      content = renderClientsPage();
+      content = await renderClientsPage();
       break;
     case 'users':
-      content = renderUsersPage();
+      content = await renderUsersPage();
       break;
     case 'albaranes':
       content = renderAlbaranesPage();

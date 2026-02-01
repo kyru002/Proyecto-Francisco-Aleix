@@ -19,7 +19,7 @@ const TicketSchema = new mongoose.Schema({
         required: true
     },
     technician: {
-        type: String, // Podría ser ObjectId si hubiera un modelo de Técnico/Usuario
+        type: String,
         required: false,
         trim: true
     },

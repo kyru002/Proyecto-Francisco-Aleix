@@ -12,6 +12,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/tickets", require("./routes/tickets"));
+app.use("/api/tecnicos", require("./routes/tecnicos"));
+app.use("/api/clientes", require("./routes/clientes"));
 
 // Ruta inicial se mantiene para verificar estado
 app.get("/", (req, res) => {
