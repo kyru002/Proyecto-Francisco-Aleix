@@ -52,27 +52,6 @@ const AlbaraniSchema = new mongoose.Schema({
                 type: Number,
                 required: true,
                 min: 0.01
-            },
-            unidad: {
-                type: String,
-                default: "unidad",
-                trim: true
-            },
-            precioUnitario: {
-                type: Number,
-                required: true,
-                min: 0
-            },
-            porcentajeDescuento: {
-                type: Number,
-                default: 0,
-                min: 0,
-                max: 100
-            },
-            importe: {
-                type: Number,
-                required: true,
-                min: 0
             }
         }
     ],
@@ -128,21 +107,8 @@ const AlbaraniSchema = new mongoose.Schema({
 // Middleware para calcular automáticamente totales
 AlbaraniSchema.pre('save', async function() {
     try {
-        // Calcular subtotal desde las líneas
-        if (this.lineas && Array.isArray(this.lineas)) {
-            this.subtotal = this.lineas.reduce((sum, linea) => {
-                return sum + (parseFloat(linea.importe) || 0);
-            }, 0);
-        } else {
-            this.subtotal = 0;
-        }
-
-        // Calcular IVA
-        const porcentajeIVA = parseFloat(this.porcentajeIVA) || 21;
-        this.iva = this.subtotal * (porcentajeIVA / 100);
-
-        // Calcular total
-        this.total = this.subtotal + this.iva;
+        // Las líneas solo contienen concepto y cantidad (horas)
+        // No hay cálculo de subtotal/IVA en este modelo simplificado
     } catch (error) {
         console.error('Error en middleware pre save:', error);
         throw error;

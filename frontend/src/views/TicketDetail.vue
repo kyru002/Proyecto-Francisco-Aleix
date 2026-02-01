@@ -99,6 +99,25 @@ const handleChangeStatus = async (newStatus) => {
   }
 };
 
+const handleReopenTicket = async () => {
+  if (!confirm('¿Deseas reabrir este ticket?')) {
+    return;
+  }
+
+  try {
+    await store.updateTicket(route.params.id, {
+      ...ticket.value,
+      status: 'abierto',
+      endDate: null
+    });
+    ticket.value.status = 'abierto';
+    ticket.value.endDate = null;
+    alert('Ticket reabierto correctamente');
+  } catch (err) {
+    alert('Error al reabrir ticket: ' + err.message);
+  }
+};
+
 const handleCloseTicketAndCreateAlbaran = async () => {
   if (!confirm('¿Deseas cerrar este ticket y crear un albarán con la información?')) {
     return;
@@ -114,21 +133,12 @@ const handleCloseTicketAndCreateAlbaran = async () => {
 
     // Guardar los datos del ticket en sessionStorage para pre-llenar el albarán
     const albaranData = {
-      cliente: ticket.value.client,
-      tecnico: ticket.value.technician || store.currentUser?.name || '',
+      cliente: ticket.value.cliente || '',
+      tecnico: ticket.value.tecnico || '',
       ticket: route.params.id,
       descripcion: `Servicio relacionado con: ${ticket.value.title}`,
       numeroAlbaran: 'AUTO_GENERATE',
-      lineas: [
-        {
-          concepto: ticket.value.title,
-          cantidad: 1,
-          unidad: 'servicio',
-          precioUnitario: 0,
-          porcentajeDescuento: 0,
-          importe: 0
-        }
-      ]
+      lineas: []
     };
 
     sessionStorage.setItem('ticketAlbaranData', JSON.stringify(albaranData));
@@ -224,8 +234,12 @@ const formatDate = (date) => {
                   <option value="cerrado">Cerrar y crear albarán</option>
                 </select>
               </div>
-              <div v-else style="display: flex; gap: 0.5rem; align-items: center;">
+              <div v-else style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <span :class="['badge', getStatusColor(ticket.status)]">{{ ticket.status }}</span>
+                <button @click="handleReopenTicket" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                  <CheckCircle style="width: 16px; height: 16px;" />
+                  Reabrir Ticket
+                </button>
                 <button @click="handleCloseTicketAndCreateAlbaran" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
                   <FileText style="width: 16px; height: 16px;" />
                   Crear Albarán
@@ -243,12 +257,12 @@ const formatDate = (date) => {
             <div style="display: grid; gap: 1rem;">
               <div>
                 <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Cliente</div>
-                <p style="margin: 0; font-weight: 500;">{{ ticket.client }}</p>
+                <p style="margin: 0; font-weight: 500;">{{ ticket.cliente?.nombreEmpresa || 'Sin asignar' }}</p>
               </div>
 
               <div>
                 <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Técnico Asignado</div>
-                <p style="margin: 0; font-weight: 500;">{{ ticket.technician || 'Sin asignar' }}</p>
+                <p style="margin: 0; font-weight: 500;">{{ ticket.tecnico?.nombre || 'Sin asignar' }}</p>
               </div>
 
               <div>

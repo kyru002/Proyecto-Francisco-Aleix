@@ -118,17 +118,7 @@ router.post("/", async (req, res) => {
             
             if (typeof linea.cantidad !== 'number' || linea.cantidad <= 0) {
                 console.error(`Error en línea ${i}: cantidad no válida. Valor:`, linea.cantidad, 'Tipo:', typeof linea.cantidad);
-                return res.status(400).json({ message: `Línea ${i + 1}: la cantidad debe ser un número mayor a 0` });
-            }
-            
-            if (typeof linea.precioUnitario !== 'number' || linea.precioUnitario < 0) {
-                console.error(`Error en línea ${i}: precioUnitario no válido. Valor:`, linea.precioUnitario, 'Tipo:', typeof linea.precioUnitario);
-                return res.status(400).json({ message: `Línea ${i + 1}: el precio debe ser un número válido` });
-            }
-            
-            if (typeof linea.importe !== 'number' || linea.importe <= 0) {
-                console.error(`Error en línea ${i}: importe no válido. Valor:`, linea.importe, 'Tipo:', typeof linea.importe);
-                return res.status(400).json({ message: `Línea ${i + 1}: el importe debe ser calculado correctamente` });
+                return res.status(400).json({ message: `Línea ${i + 1}: la cantidad (horas) debe ser un número mayor a 0` });
             }
         }
         console.log('Todas las líneas son válidas');
@@ -175,13 +165,8 @@ router.post("/", async (req, res) => {
             descripcion: descripcion || '',
             lineas: lineas.map(linea => ({
                 concepto: linea.concepto.toString().trim(),
-                cantidad: Number(linea.cantidad),
-                unidad: linea.unidad || 'unidad',
-                precioUnitario: Number(linea.precioUnitario),
-                porcentajeDescuento: Number(linea.porcentajeDescuento) || 0,
-                importe: Number(linea.importe)
+                cantidad: Number(linea.cantidad)
             })),
-            porcentajeIVA: Number(porcentajeIVA) || 21,
             notas: notas || '',
             observaciones: observaciones || ''
         });

@@ -36,12 +36,32 @@ const newAlbarani = ref({
 
 const newLinea = ref({
   concepto: '',
-  cantidad: 1,
-  unidad: 'unidad',
-  precioUnitario: 0,
-  porcentajeDescuento: 0,
-  importe: 0
+  cantidad: 1
 });
+
+const generarNumeroAlbaran = async () => {
+  try {
+    const year = new Date().getFullYear();
+    const albaran = store.albaranes
+      .filter(a => a.numeroAlbaran.includes(`ALB-${year}`))
+      .sort((a, b) => {
+        const numA = parseInt(a.numeroAlbaran.split('-')[2]);
+        const numB = parseInt(b.numeroAlbaran.split('-')[2]);
+        return numB - numA;
+      })[0];
+    
+    let nextNumber = 1;
+    if (albaran) {
+      const lastNumber = parseInt(albaran.numeroAlbaran.split('-')[2]);
+      nextNumber = lastNumber + 1;
+    }
+    
+    return `ALB-${year}-${String(nextNumber).padStart(3, '0')}`;
+  } catch (err) {
+    console.error('Error al generar número de albarán:', err);
+    return `ALB-${Date.now()}`;
+  }
+};
 
 onMounted(async () => {
   await store.fetchAll();
@@ -51,9 +71,14 @@ onMounted(async () => {
   if (ticketAlbaranData) {
     try {
       const data = JSON.parse(ticketAlbaranData);
+      
+      // Generar el número de albarán automáticamente
+      const numeroAlbaranGenerado = await generarNumeroAlbaran();
+      
       newAlbarani.value = {
         ...newAlbarani.value,
-        ...data
+        ...data,
+        numeroAlbaran: numeroAlbaranGenerado
       };
       // Limpiar del sessionStorage después de usarlo
       sessionStorage.removeItem('ticketAlbaranData');
@@ -75,13 +100,7 @@ const albaranesFiltered = computed(() => {
 });
 
 const calcularImporte = () => {
-  const cantidad = parseFloat(newLinea.value.cantidad) || 0;
-  const precio = parseFloat(newLinea.value.precioUnitario) || 0;
-  const descuento = parseFloat(newLinea.value.porcentajeDescuento) || 0;
-  
-  const subtotal = cantidad * precio;
-  const descuentoAplicado = subtotal * (descuento / 100);
-  newLinea.value.importe = Math.max(0, subtotal - descuentoAplicado);
+  // Función removida - solo se necesita concepto y cantidad (horas)
 };
 
 const agregarLinea = () => {
@@ -97,39 +116,16 @@ const agregarLinea = () => {
     return;
   }
   
-  const precio = parseFloat(newLinea.value.precioUnitario);
-  if (isNaN(precio) || precio < 0) {
-    alert('El precio debe ser un número válido y mayor o igual a 0');
-    return;
-  }
-  
-  // Calcular importe antes de agregar
-  calcularImporte();
-  
-  // Validar que el importe sea mayor a 0
-  if (newLinea.value.importe <= 0) {
-    alert('El importe debe ser mayor a 0');
-    return;
-  }
-  
   // Agregar la línea con valores parseados correctamente
   newAlbarani.value.lineas.push({
     concepto: newLinea.value.concepto.trim(),
-    cantidad: parseFloat(newLinea.value.cantidad),
-    unidad: newLinea.value.unidad || 'unidad',
-    precioUnitario: parseFloat(newLinea.value.precioUnitario),
-    porcentajeDescuento: parseFloat(newLinea.value.porcentajeDescuento) || 0,
-    importe: newLinea.value.importe
+    cantidad: parseFloat(newLinea.value.cantidad)
   });
   
   // Limpiar formulario
   newLinea.value = {
     concepto: '',
-    cantidad: 1,
-    unidad: 'unidad',
-    precioUnitario: 0,
-    porcentajeDescuento: 0,
-    importe: 0
+    cantidad: 1
   };
   
   alert('Línea agregada correctamente');
@@ -157,21 +153,17 @@ const handleCreateAlbarani = async () => {
       return;
     }
 
-    // Validar que todas las líneas tengan importes calculados
+    // Validar que todas las líneas tengan concepto y cantidad
     const lineasValidas = newAlbarani.value.lineas.every(linea => {
       console.log('Validando línea:', linea);
       return linea.concepto && 
              linea.concepto.trim() !== '' &&
              typeof linea.cantidad === 'number' && 
-             linea.cantidad > 0 && 
-             typeof linea.precioUnitario === 'number' &&
-             linea.precioUnitario >= 0 && 
-             typeof linea.importe === 'number' &&
-             linea.importe > 0;
+             linea.cantidad > 0;
     });
 
     if (!lineasValidas) {
-      alert('Todas las líneas deben tener concepto, cantidad y precio válidos');
+      alert('Todas las líneas deben tener concepto y cantidad (horas) válidos');
       console.error('Líneas inválidas:', newAlbarani.value.lineas);
       return;
     }
@@ -186,13 +178,8 @@ const handleCreateAlbarani = async () => {
       descripcion: newAlbarani.value.descripcion || '',
       lineas: newAlbarani.value.lineas.map(linea => ({
         concepto: String(linea.concepto).trim(),
-        cantidad: Number(linea.cantidad),
-        unidad: String(linea.unidad || 'unidad'),
-        precioUnitario: Number(linea.precioUnitario),
-        porcentajeDescuento: Number(linea.porcentajeDescuento) || 0,
-        importe: Number(linea.importe)
+        cantidad: Number(linea.cantidad)
       })),
-      porcentajeIVA: Number(newAlbarani.value.porcentajeIVA) || 21,
       notas: newAlbarani.value.notas || ''
     };
 
@@ -371,36 +358,16 @@ const getEstadoColor = (estado) => {
             <thead>
               <tr style="border-bottom: 1px solid var(--border);">
                 <th style="text-align: left; padding: 0.5rem;">Concepto</th>
-                <th style="text-align: center; padding: 0.5rem;">Cantidad</th>
-                <th style="text-align: right; padding: 0.5rem;">Precio</th>
-                <th style="text-align: right; padding: 0.5rem;">Importe</th>
+                <th style="text-align: center; padding: 0.5rem;">Horas</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(linea, index) in albarani.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 0.5rem;">{{ linea.concepto }}</td>
-                <td style="text-align: center; padding: 0.5rem;">{{ linea.cantidad }} {{ linea.unidad }}</td>
-                <td style="text-align: right; padding: 0.5rem;">{{ linea.precioUnitario.toFixed(2) }}€</td>
-                <td style="text-align: right; padding: 0.5rem; font-weight: 600;">{{ linea.importe.toFixed(2) }}€</td>
+                <td style="text-align: center; padding: 0.5rem;">{{ linea.cantidad }}</td>
               </tr>
             </tbody>
           </table>
-        </div>
-
-        <!-- Resumen financiero -->
-        <div style="display: flex; justify-content: flex-end; gap: 3rem; margin-top: 1rem; font-size: 0.85rem;">
-          <div>
-            <div style="color: var(--muted-foreground);">Subtotal</div>
-            <div style="font-weight: 600;">{{ calcularTotales(albarani).subtotal }}€</div>
-          </div>
-          <div>
-            <div style="color: var(--muted-foreground);">IVA ({{ albarani.porcentajeIVA }}%)</div>
-            <div style="font-weight: 600;">{{ calcularTotales(albarani).iva }}€</div>
-          </div>
-          <div>
-            <div style="color: var(--muted-foreground);">Total</div>
-            <div style="font-weight: 700; font-size: 1.05rem;">{{ calcularTotales(albarani).total }}€</div>
-          </div>
         </div>
       </div>
     </div>
@@ -454,25 +421,17 @@ const getEstadoColor = (estado) => {
               <h3 style="font-weight: 600; margin-bottom: 1rem;">Líneas de Albarán *</h3>
               <p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 1rem;">Completa todos los campos y haz clic en "+" para agregar una línea.</p>
               
-              <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 50px; gap: 0.5rem; margin-bottom: 1rem;">
+              <div style="display: grid; grid-template-columns: 2fr 1fr 50px; gap: 0.5rem; margin-bottom: 1rem;">
                 <div>
                   <label style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-bottom: 0.25rem;">Concepto</label>
-                  <input v-model="newLinea.concepto" type="text" class="form-input" placeholder="Ej: Monitor">
+                  <input v-model="newLinea.concepto" type="text" class="form-input" placeholder="Ej: Reparación monitor">
                 </div>
                 <div>
-                  <label style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-bottom: 0.25rem;">Cantidad</label>
-                  <input v-model.number="newLinea.cantidad" type="number" class="form-input" placeholder="1" step="0.01" min="0.01">
-                </div>
-                <div>
-                  <label style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-bottom: 0.25rem;">Precio</label>
-                  <input v-model.number="newLinea.precioUnitario" type="number" class="form-input" placeholder="100" step="0.01" min="0">
-                </div>
-                <div>
-                  <label style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-bottom: 0.25rem;">Desc %</label>
-                  <input v-model.number="newLinea.porcentajeDescuento" type="number" class="form-input" placeholder="0" step="0.01" min="0" max="100">
+                  <label style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-bottom: 0.25rem;">Horas</label>
+                  <input v-model.number="newLinea.cantidad" type="number" class="form-input" placeholder="1" step="0.25" min="0.25">
                 </div>
                 <div style="display: flex; align-items: flex-end;">
-                  <button type="button" @click="agregarLinea" class="btn btn-primary" style="width: 100%; padding: 0.5rem; font-weight: 600;">Agregar</button>
+                  <button type="button" @click="agregarLinea" class="btn btn-primary" style="width: 100%; padding: 0.5rem; font-weight: 600;">+</button>
                 </div>
               </div>
 
@@ -483,9 +442,7 @@ const getEstadoColor = (estado) => {
                   <thead>
                     <tr style="border-bottom: 1px solid var(--border);">
                       <th style="text-align: left; padding: 0.5rem;">Concepto</th>
-                      <th style="text-align: center; padding: 0.5rem;">Cantidad</th>
-                      <th style="text-align: right; padding: 0.5rem;">Precio</th>
-                      <th style="text-align: right; padding: 0.5rem;">Importe</th>
+                      <th style="text-align: center; padding: 0.5rem;">Horas</th>
                       <th style="text-align: center; padding: 0.5rem;">Acción</th>
                     </tr>
                   </thead>
@@ -493,8 +450,6 @@ const getEstadoColor = (estado) => {
                     <tr v-for="(linea, index) in newAlbarani.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 0.5rem;">{{ linea.concepto }}</td>
                       <td style="text-align: center; padding: 0.5rem;">{{ linea.cantidad }}</td>
-                      <td style="text-align: right; padding: 0.5rem;">{{ linea.precioUnitario.toFixed(2) }}€</td>
-                      <td style="text-align: right; padding: 0.5rem; font-weight: 600;">{{ linea.importe.toFixed(2) }}€</td>
                       <td style="text-align: center; padding: 0.5rem;">
                         <button type="button" @click="eliminarLinea(index)" class="btn btn-ghost btn-icon" style="padding: 0.25rem;">×</button>
                       </td>
@@ -503,15 +458,11 @@ const getEstadoColor = (estado) => {
                 </table>
               </div>
               <div v-else style="padding: 1rem; background-color: var(--primary-light); border-radius: var(--radius); text-align: center; margin-bottom: 1rem;">
-                <p style="font-size: 0.85rem; color: var(--primary);">Aún no hay líneas. Completa los campos y haz clic en "Agregar"</p>
+                <p style="font-size: 0.85rem; color: var(--primary);">Aún no hay líneas. Completa los campos y haz clic en "+"</p>
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-              <div class="form-group">
-                <label class="form-label">% IVA</label>
-                <input v-model.number="newAlbarani.porcentajeIVA" type="number" class="form-input" placeholder="21" step="0.01" min="0">
-              </div>
               <div class="form-group">
                 <label class="form-label">Notas</label>
                 <input v-model="newAlbarani.notas" type="text" class="form-input" placeholder="Notas adicionales">

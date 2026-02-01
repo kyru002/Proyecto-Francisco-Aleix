@@ -11,10 +11,10 @@ const TicketSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    client: {
-        type: String,
-        required: true,
-        trim: true
+    cliente: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Cliente',
+        required: true
     },
     status: {
         type: String,
@@ -28,10 +28,10 @@ const TicketSchema = new mongoose.Schema({
         default: "media",
         required: true
     },
-    technician: {
-        type: String,
-        required: false,
-        trim: true
+    tecnico: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tecnico',
+        required: false
     },
     startDate: {
         type: Date,

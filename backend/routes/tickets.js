@@ -5,7 +5,10 @@ const Ticket = require("../models/Ticket");
 // Obtener todos los tickets
 router.get("/", async (req, res) => {
     try {
-        const tickets = await Ticket.find().sort({ createdAt: -1 });
+        const tickets = await Ticket.find()
+            .populate('cliente')
+            .populate('tecnico')
+            .sort({ createdAt: -1 });
         res.json(tickets);
     } catch (error) {
         res.status(500).json({ msg: "Error al obtener los tickets" });
@@ -67,7 +70,9 @@ router.post("/:id/messages", async (req, res) => {
 // Obtener un ticket por ID (DEBE estar después de rutas específicas)
 router.get("/:id", async (req, res) => {
     try {
-        const ticket = await Ticket.findById(req.params.id);
+        const ticket = await Ticket.findById(req.params.id)
+            .populate('cliente')
+            .populate('tecnico');
         if (!ticket) {
             return res.status(404).json({ msg: "Ticket no encontrado" });
         }
@@ -84,7 +89,9 @@ router.put("/:id", async (req, res) => {
             req.params.id,
             req.body,
             { new: true }
-        );
+        )
+        .populate('cliente')
+        .populate('tecnico');
         res.json(updatedTicket);
     } catch (error) {
         res.status(500).json({ msg: "Error al actualizar el ticket" });
