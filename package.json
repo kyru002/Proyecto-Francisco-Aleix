@@ -19,5 +19,6 @@
   "bugs": {
     "url": "https://github.com/kyru002/Proyecto-Francisco-Aleix/issues"
   },
-  "homepage": "https://github.com/kyru002/Proyecto-Francisco-Aleix#readme"
+  "homepage": "https://github.com/kyru002/Proyecto-Francisco-Aleix#readme",
+  "dependencies": {}
 }
