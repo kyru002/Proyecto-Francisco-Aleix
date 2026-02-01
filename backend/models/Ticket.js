@@ -1,8 +1,18 @@
 const mongoose = require("mongoose");
 
 const TicketSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    description: {
+        type: String,
+        required: true,
+        trim: true
+    },
     client: {
-        type: String, // Podría ser ObjectId si hubiera un modelo de Cliente
+        type: String,
         required: true,
         trim: true
     },
@@ -30,14 +40,29 @@ const TicketSchema = new mongoose.Schema({
     endDate: {
         type: Date
     },
-    description: {
-        type: String,
-        required: true
-    },
-    title: {
-        type: String,
-        required: true
-    }
+    messages: [
+        {
+            author: {
+                type: String,
+                required: true,
+                trim: true
+            },
+            role: {
+                type: String,
+                enum: ["cliente", "tecnico", "admin"],
+                required: true
+            },
+            content: {
+                type: String,
+                required: true,
+                trim: true
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now
+            }
+        }
+    ]
 }, {
     timestamps: true
 });

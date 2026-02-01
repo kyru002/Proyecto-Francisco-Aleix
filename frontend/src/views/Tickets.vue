@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
 import { 
   Plus, 
@@ -12,6 +13,7 @@ import {
   FileText
 } from 'lucide-vue-next';
 
+const router = useRouter();
 const store = useAppStore();
 const showCreateModal = ref(false);
 const newTicket = ref({
@@ -68,7 +70,7 @@ const handleDeleteTicket = async (ticketId) => {
 };
 
 const handleViewTicket = (ticket) => {
-  console.log('Ver ticket:', ticket);
+  router.push(`/tickets/${ticket._id}`);
 };
 </script>
 
@@ -169,7 +171,7 @@ const handleViewTicket = (ticket) => {
               <label class="form-label">Cliente / Empresa</label>
               <select v-model="editingTicket.client" class="form-input form-select" required>
                 <option value="" disabled>Seleccionar cliente</option>
-                <option v-for="c in store.clientes" :key="c.id" :value="c.company || c.nombreEmpresa">{{ c.company || c.nombreEmpresa }} ({{ c.name || c.nombreContacto }})</option>
+                <option v-for="c in store.clientes" :key="c._id" :value="c.nombreEmpresa || c.company">{{ c.nombreEmpresa || c.company }} ({{ c.nombreContacto || c.name }})</option>
               </select>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -194,7 +196,7 @@ const handleViewTicket = (ticket) => {
               <label class="form-label">Asignar a Técnico</label>
               <select v-model="editingTicket.technician" class="form-input form-select">
                 <option value="">Sin asignar</option>
-                <option v-for="t in store.tecnicos" :key="t.id" :value="t.name || t.nombre">{{ t.name || t.nombre }}</option>
+                <option v-for="t in store.tecnicos" :key="t._id" :value="t.nombre || t.name">{{ t.nombre || t.name }}</option>
               </select>
             </div>
             <div class="form-group">
@@ -226,7 +228,7 @@ const handleViewTicket = (ticket) => {
               <label class="form-label">Cliente / Empresa</label>
               <select v-model="newTicket.client" class="form-input form-select" required>
                 <option value="" disabled>Seleccionar cliente</option>
-                <option v-for="c in store.clientes" :key="c.id" :value="c.company">{{ c.company }} ({{ c.name }})</option>
+                <option v-for="c in store.clientes" :key="c._id" :value="c.nombreEmpresa">{{ c.nombreEmpresa }} ({{ c.nombreContacto }})</option>
               </select>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -242,7 +244,7 @@ const handleViewTicket = (ticket) => {
                 <label class="form-label">Asignar a Técnico</label>
                 <select v-model="newTicket.technician" class="form-input form-select">
                   <option value="">Sin asignar</option>
-                  <option v-for="t in store.tecnicos" :key="t.id" :value="t.name">{{ t.name }}</option>
+                <option v-for="t in store.tecnicos" :key="t._id" :value="t.nombre">{{ t.nombre }}</option>
                 </select>
               </div>
             </div>

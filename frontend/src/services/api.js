@@ -15,6 +15,8 @@ export const ticketsService = {
     create: (data) => api.post('/tickets', data).then(res => res.data),
     update: (id, data) => api.put(`/tickets/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/tickets/${id}`).then(res => res.data),
+    getMessages: (id) => api.get(`/tickets/${id}/messages`).then(res => res.data),
+    sendMessage: (id, messageData) => api.post(`/tickets/${id}/messages`, messageData).then(res => res.data),
 };
 
 export const tecnicosService = {

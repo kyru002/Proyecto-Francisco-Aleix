@@ -45,6 +45,24 @@ const newLinea = ref({
 
 onMounted(async () => {
   await store.fetchAll();
+  
+  // Verificar si hay datos de ticket pre-llenados desde TicketDetail
+  const ticketAlbaranData = sessionStorage.getItem('ticketAlbaranData');
+  if (ticketAlbaranData) {
+    try {
+      const data = JSON.parse(ticketAlbaranData);
+      newAlbarani.value = {
+        ...newAlbarani.value,
+        ...data
+      };
+      // Limpiar del sessionStorage después de usarlo
+      sessionStorage.removeItem('ticketAlbaranData');
+      // Abrir automáticamente el modal de creación
+      showCreateModal.value = true;
+    } catch (err) {
+      console.error('Error al cargar datos del ticket:', err);
+    }
+  }
 });
 
 const albaranesFiltered = computed(() => {

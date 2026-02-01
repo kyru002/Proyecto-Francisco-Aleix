@@ -22,38 +22,6 @@ router.get("/numero/siguiente", async (req, res) => {
     }
 });
 
-// Obtener todos los albaranes
-router.get("/", async (req, res) => {
-    try {
-        const albaranes = await Albarani.find()
-            .populate('cliente')
-            .populate('tecnico')
-            .populate('ticket')
-            .sort({ fechaAlbaran: -1 });
-        res.json(albaranes);
-    } catch (error) {
-        res.status(500).json({ message: "Error al obtener albaranes", error: error.message });
-    }
-});
-
-// Obtener un albarán por ID
-router.get("/:id", async (req, res) => {
-    try {
-        const albarani = await Albarani.findById(req.params.id)
-            .populate('cliente')
-            .populate('tecnico')
-            .populate('ticket');
-        
-        if (!albarani) {
-            return res.status(404).json({ message: "Albarán no encontrado" });
-        }
-        
-        res.json(albarani);
-    } catch (error) {
-        res.status(500).json({ message: "Error al obtener el albarán", error: error.message });
-    }
-});
-
 // Obtener albaranes por estado (DEBE estar antes de /:id)
 router.get("/estado/:estado", async (req, res) => {
     try {
@@ -79,6 +47,38 @@ router.get("/cliente/:clienteId", async (req, res) => {
         res.json(albaranes);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener albaranes del cliente", error: error.message });
+    }
+});
+
+// Obtener todos los albaranes
+router.get("/", async (req, res) => {
+    try {
+        const albaranes = await Albarani.find()
+            .populate('cliente')
+            .populate('tecnico')
+            .populate('ticket')
+            .sort({ fechaAlbaran: -1 });
+        res.json(albaranes);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener albaranes", error: error.message });
+    }
+});
+
+// Obtener un albarán por ID (DEBE estar después de las rutas específicas)
+router.get("/:id", async (req, res) => {
+    try {
+        const albarani = await Albarani.findById(req.params.id)
+            .populate('cliente')
+            .populate('tecnico')
+            .populate('ticket');
+        
+        if (!albarani) {
+            return res.status(404).json({ message: "Albarán no encontrado" });
+        }
+        
+        res.json(albarani);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener el albarán", error: error.message });
     }
 });
 

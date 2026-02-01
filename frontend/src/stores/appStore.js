@@ -57,7 +57,7 @@ export const useAppStore = defineStore('app', {
         },
         async updateCliente(id, data) {
             const updatedCliente = await clientesService.update(id, data);
-            const index = this.clientes.findIndex(c => c.id === id);
+            const index = this.clientes.findIndex(c => c._id === id);
             if (index !== -1) {
                 this.clientes[index] = updatedCliente;
             }
@@ -65,11 +65,11 @@ export const useAppStore = defineStore('app', {
         },
         async deleteCliente(id) {
             await clientesService.delete(id);
-            this.clientes = this.clientes.filter(c => c.id !== id);
+            this.clientes = this.clientes.filter(c => c._id !== id);
         },
         async updateTecnico(id, data) {
             const updatedTecnico = await tecnicosService.update(id, data);
-            const index = this.tecnicos.findIndex(t => t.id === id);
+            const index = this.tecnicos.findIndex(t => t._id === id);
             if (index !== -1) {
                 this.tecnicos[index] = updatedTecnico;
             }
@@ -77,11 +77,11 @@ export const useAppStore = defineStore('app', {
         },
         async deleteTecnico(id) {
             await tecnicosService.delete(id);
-            this.tecnicos = this.tecnicos.filter(t => t.id !== id);
+            this.tecnicos = this.tecnicos.filter(t => t._id !== id);
         },
         async updateTicket(id, data) {
             const updatedTicket = await ticketsService.update(id, data);
-            const index = this.tickets.findIndex(t => t.id === id);
+            const index = this.tickets.findIndex(t => t._id === id);
             if (index !== -1) {
                 this.tickets[index] = updatedTicket;
             }
@@ -89,7 +89,18 @@ export const useAppStore = defineStore('app', {
         },
         async deleteTicket(id) {
             await ticketsService.delete(id);
-            this.tickets = this.tickets.filter(t => t.id !== id);
+            this.tickets = this.tickets.filter(t => t._id !== id);
+        },
+        async getTicketMessages(id) {
+            return await ticketsService.getMessages(id);
+        },
+        async sendTicketMessage(id, messageData) {
+            const updatedTicket = await ticketsService.sendMessage(id, messageData);
+            const index = this.tickets.findIndex(t => t._id === id);
+            if (index !== -1) {
+                this.tickets[index] = updatedTicket;
+            }
+            return updatedTicket;
         },
         async createAlbarani(data) {
             const nuevoAlbarani = await albaranesService.create(data);
@@ -98,7 +109,7 @@ export const useAppStore = defineStore('app', {
         },
         async updateAlbarani(id, data) {
             const updatedAlbarani = await albaranesService.update(id, data);
-            const index = this.albaranes.findIndex(a => a.id === id);
+            const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
                 this.albaranes[index] = updatedAlbarani;
             }
@@ -106,11 +117,11 @@ export const useAppStore = defineStore('app', {
         },
         async deleteAlbarani(id) {
             await albaranesService.delete(id);
-            this.albaranes = this.albaranes.filter(a => a.id !== id);
+            this.albaranes = this.albaranes.filter(a => a._id !== id);
         },
         async cambiarEstadoAlbarani(id, estado) {
             const updatedAlbarani = await albaranesService.cambiarEstado(id, estado);
-            const index = this.albaranes.findIndex(a => a.id === id);
+            const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
                 this.albaranes[index] = updatedAlbarani;
             }
@@ -118,7 +129,7 @@ export const useAppStore = defineStore('app', {
         },
         async entregarAlbarani(id, firmante) {
             const updatedAlbarani = await albaranesService.entregar(id, firmante);
-            const index = this.albaranes.findIndex(a => a.id === id);
+            const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
                 this.albaranes[index] = updatedAlbarani;
             }

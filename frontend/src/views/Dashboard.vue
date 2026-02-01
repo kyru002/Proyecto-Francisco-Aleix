@@ -64,7 +64,7 @@ const recentTickets = computed(() => store.tickets.slice(0, 5));
             <p>No hay tickets recientes.</p>
           </div>
           <div v-else>
-            <div v-for="ticket in recentTickets" :key="ticket.id" class="ticket-list-item">
+            <div v-for="ticket in recentTickets" :key="ticket._id" class="ticket-list-item">
               <div class="ticket-info">
                 <div class="ticket-title">{{ ticket.title }}</div>
                 <div class="ticket-meta">{{ ticket.client }} • Asignado a: {{ ticket.technician || 'Sin asignar' }}</div>

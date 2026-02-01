@@ -10,7 +10,9 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Users,
+  Ticket
 } from 'lucide-vue-next';
 
 const store = useAppStore();
@@ -46,7 +48,7 @@ const handleEditClient = (client) => {
 
 const handleSaveEdit = async () => {
   try {
-    await store.updateCliente(editingClient.value.id, editingClient.value);
+    await store.updateCliente(editingClient.value._id, editingClient.value);
     showEditModal.value = false;
     editingClient.value = null;
   } catch (error) {
@@ -62,6 +64,7 @@ const handleDeleteClient = async (clientId) => {
   if (confirm('¿Estás seguro de que quieres eliminar este cliente?')) {
     try {
       await store.deleteCliente(clientId);
+      await store.fetchAll();
     } catch (error) {
       alert('Error al eliminar el cliente');
     }
@@ -101,7 +104,7 @@ const handleDeleteClient = async (clientId) => {
     </div>
 
     <div v-else class="clients-grid">
-      <div v-for="client in store.clientes" :key="client.id" class="card client-card">
+      <div v-for="client in store.clientes" :key="client._id" class="card client-card">
         <div class="client-card-header">
           <div class="client-icon">
             <Building2 />
@@ -130,7 +133,7 @@ const handleDeleteClient = async (clientId) => {
           <button @click="handleEditClient(client)" class="btn btn-secondary btn-icon" title="Editar">
             <Edit />
           </button>
-          <button @click="handleDeleteClient(client.id)" class="btn btn-ghost btn-icon" title="Eliminar">
+          <button @click="handleDeleteClient(client._id)" class="btn btn-ghost btn-icon" title="Eliminar">
             <Trash2 />
           </button>
           <button @click="handleViewClient(client)" class="btn btn-ghost btn-icon" style="margin-left: auto;" title="Ver detalles">

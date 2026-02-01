@@ -23,6 +23,60 @@ router.post("/", async (req, res) => {
     }
 });
 
+// Obtener mensajes de un ticket (DEBE estar antes de /:id)
+router.get("/:id/messages", async (req, res) => {
+    try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ msg: "Ticket no encontrado" });
+        }
+        res.json(ticket.messages || []);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al obtener mensajes", error: error.message });
+    }
+});
+
+// Enviar mensaje en un ticket (DEBE estar antes de /:id)
+router.post("/:id/messages", async (req, res) => {
+    try {
+        const { author, role, content } = req.body;
+
+        if (!author || !role || !content) {
+            return res.status(400).json({ msg: "Faltan campos requeridos: author, role, content" });
+        }
+
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ msg: "Ticket no encontrado" });
+        }
+
+        ticket.messages.push({
+            author: author.trim(),
+            role: role,
+            content: content.trim(),
+            createdAt: new Date()
+        });
+
+        await ticket.save();
+        res.status(201).json(ticket);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al enviar mensaje", error: error.message });
+    }
+});
+
+// Obtener un ticket por ID (DEBE estar después de rutas específicas)
+router.get("/:id", async (req, res) => {
+    try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ msg: "Ticket no encontrado" });
+        }
+        res.json(ticket);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al obtener el ticket", error: error.message });
+    }
+});
+
 // Actualizar un ticket
 router.put("/:id", async (req, res) => {
     try {

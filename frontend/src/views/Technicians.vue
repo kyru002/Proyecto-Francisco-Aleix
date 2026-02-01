@@ -46,7 +46,7 @@ const handleEditTecnico = (tecnico) => {
 
 const handleSaveEdit = async () => {
   try {
-    await store.updateTecnico(editingTecnico.value.id, editingTecnico.value);
+    await store.updateTecnico(editingTecnico.value._id, editingTecnico.value);
     showEditModal.value = false;
     editingTecnico.value = null;
   } catch (error) {
@@ -97,7 +97,7 @@ const toggleMenu = (tecnicoId) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="tecnico in store.tecnicos" :key="tecnico.id">
+            <tr v-for="tecnico in store.tecnicos" :key="tecnico._id">
               <td>
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                   <div class="sidebar-avatar">{{ tecnico.nombre.charAt(0) }}</div>
@@ -121,14 +121,14 @@ const toggleMenu = (tecnicoId) => {
               <td>{{ tecnico.ticketsAssigned || 0 }}</td>
               <td>
                 <div style="position: relative;">
-                  <button @click="toggleMenu(tecnico.id)" class="btn btn-ghost btn-icon">
+                  <button @click="toggleMenu(tecnico._id)" class="btn btn-ghost btn-icon">
                     <MoreVertical />
                   </button>
-                  <div v-if="showMenuId === tecnico.id" style="position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; min-width: 150px;">
+                  <div v-if="showMenuId === tecnico._id" style="position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; min-width: 150px;">
                     <button @click="handleEditTecnico(tecnico)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem;" type="button">
                       Editar
                     </button>
-                    <button @click="handleDeleteTecnico(tecnico.id)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--destructive);" type="button">
+                    <button @click="handleDeleteTecnico(tecnico._id)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--destructive);" type="button">
                       Eliminar
                     </button>
                   </div>
