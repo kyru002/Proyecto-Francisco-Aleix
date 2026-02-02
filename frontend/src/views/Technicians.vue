@@ -17,7 +17,7 @@ const newTecnico = ref({
   nombre: '',
   email: '',
   role: 'technician',
-  estado: 'active'
+  estado: 'activo'
 });
 
 onMounted(async () => {
@@ -32,9 +32,10 @@ const handleCreateTecnico = async () => {
   try {
     await store.createTecnico(newTecnico.value);
     showCreateModal.value = false;
-    newTecnico.value = { nombre: '', email: '', role: 'technician', estado: 'active' };
+    newTecnico.value = { nombre: '', email: '', role: 'technician', estado: 'activo' };
   } catch (error) {
-    alert('Error al crear el técnico');
+    console.error('Error al crear técnico:', error);
+    alert(`Error al crear el técnico: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
   }
 };
 

@@ -12,7 +12,12 @@ import {
   Trash2,
   ExternalLink,
   Users,
-  Ticket
+  Ticket,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Clock,
+  CheckCircle
 } from 'lucide-vue-next';
 
 const store = useAppStore();
@@ -30,6 +35,7 @@ onMounted(async () => {
 
 const editingClient = ref(null);
 const showEditModal = ref(false);
+const expandedClientId = ref(null);
 
 const handleCreateClient = async () => {
   try {
@@ -69,6 +75,25 @@ const handleDeleteClient = async (clientId) => {
       alert('Error al eliminar el cliente');
     }
   }
+};
+
+const toggleClientTickets = (clientId) => {
+  expandedClientId.value = expandedClientId.value === clientId ? null : clientId;
+};
+
+const getClientTickets = (clientId) => {
+  console.log('Filtrando tickets para cliente:', clientId);
+  const filtered = store.tickets.filter(ticket => {
+    // ticket.cliente puede ser un string (ID) o un objeto poblado
+    const ticketClientId = typeof ticket.cliente === 'object' ? ticket.cliente?._id : ticket.cliente;
+    const match = String(ticketClientId) === String(clientId);
+    if (match) {
+      console.log('Ticket encontrado:', ticket.title, 'Cliente ID:', ticketClientId);
+    }
+    return match;
+  });
+  console.log('Total tickets encontrados:', filtered.length);
+  return filtered;
 };
 </script>
 
@@ -111,7 +136,7 @@ const handleDeleteClient = async (clientId) => {
           </div>
           <div class="client-tickets">
             <Ticket style="width: 14px; height: 14px;" />
-            {{ client.ticketCount || 0 }} Tickets
+            {{ getClientTickets(client._id).length }} Tickets
           </div>
         </div>
         
@@ -136,9 +161,71 @@ const handleDeleteClient = async (clientId) => {
           <button @click="handleDeleteClient(client._id)" class="btn btn-ghost btn-icon" title="Eliminar">
             <Trash2 />
           </button>
-          <button @click="handleViewClient(client)" class="btn btn-ghost btn-icon" style="margin-left: auto;" title="Ver detalles">
-            <ExternalLink />
+          <button 
+            @click="toggleClientTickets(client._id)" 
+            class="btn btn-ghost btn-icon" 
+            :title="expandedClientId === client._id ? 'Ocultar tickets' : 'Ver tickets'"
+            style="margin-left: auto;"
+          >
+            <ChevronDown v-if="expandedClientId !== client._id" />
+            <ChevronUp v-else />
           </button>
+        </div>
+
+        <!-- Tickets del cliente (expandible) -->
+        <div v-if="expandedClientId === client._id" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--foreground);">
+            Tickets del cliente ({{ getClientTickets(client._id).length }})
+          </h4>
+          
+          <div v-if="getClientTickets(client._id).length === 0" style="text-align: center; padding: 1rem; color: var(--muted-foreground);">
+            <Ticket style="width: 24px; height: 24px; opacity: 0.5; margin-bottom: 0.5rem;" />
+            <p style="font-size: 0.875rem;">No hay tickets registrados para este cliente</p>
+          </div>
+          
+          <div v-else style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div 
+              v-for="ticket in getClientTickets(client._id)" 
+              :key="ticket._id"
+              class="client-ticket-item"
+              :class="{ 'ticket-completed': ticket.status === 'cerrado' }"
+            >
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 500; font-size: 0.875rem; margin-bottom: 0.25rem; color: var(--foreground);">
+                    {{ ticket.title }}
+                    <span v-if="ticket.status === 'cerrado'" style="color: var(--success); font-size: 0.75rem; margin-left: 0.5rem;">
+                      ✓ Completado
+                    </span>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--muted-foreground);">
+                    #{{ ticket._id.slice(-6).toUpperCase() }} • 
+                    {{ ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A' }}
+                    <span v-if="ticket.endDate" style="margin-left: 0.5rem; color: var(--success);">
+                      • Finalizado: {{ new Date(ticket.endDate).toLocaleDateString() }}
+                    </span>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 1rem;">
+                  <span class="badge" :class="'badge-' + (ticket.status === 'en progreso' ? 'in-progress' : ticket.status)">
+                    <CheckCircle v-if="ticket.status === 'cerrado'" style="width: 10px; height: 10px; margin-right: 0.25rem;" />
+                    {{ ticket.status }}
+                  </span>
+                  <span class="badge" :class="'badge-' + (ticket.priority === 'media' ? 'medium' : (ticket.priority === 'baja' ? 'low' : 'high'))">
+                    {{ ticket.priority }}
+                  </span>
+                  <button 
+                    @click="$router.push(`/tickets/${ticket._id}`)" 
+                    class="btn btn-ghost btn-icon" 
+                    title="Ver ticket"
+                    style="padding: 0.25rem;"
+                  >
+                    <ExternalLink style="width: 14px; height: 14px;" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

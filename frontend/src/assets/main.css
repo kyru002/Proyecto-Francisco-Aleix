@@ -27,6 +27,7 @@
   
   --success: #10b981;
   --success-light: #d1fae5;
+  --success-hover: #059669;
   
   --warning: #f59e0b;
   --warning-light: #fef3c7;
@@ -342,6 +343,15 @@ body {
 
 .btn-destructive:hover:not(:disabled) {
   background-color: var(--destructive-hover);
+}
+
+.btn-success {
+  background-color: var(--success);
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: var(--success-hover);
 }
 
 .btn-icon {
@@ -1273,4 +1283,150 @@ body {
 
 .sidebar-overlay.open {
   display: block;
+}
+
+/* ========================================
+   Ticket Styles
+   ======================================== */
+
+.ticket-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  background-color: var(--card);
+  transition: all 0.2s ease;
+}
+
+.ticket-list-item:hover {
+  background-color: var(--muted);
+  border-color: var(--primary-light);
+}
+
+.ticket-list-item.ticket-completed {
+  background-color: var(--success-light);
+  border-color: var(--success);
+  position: relative;
+}
+
+.ticket-list-item.ticket-completed::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--success);
+  border-radius: 2px 0 0 2px;
+}
+
+.ticket-list-item.ticket-completed:hover {
+  background-color: #d1fae5;
+  border-color: #059669;
+}
+
+.ticket-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-title {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.ticket-meta {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   Badges
+   ======================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+.badge-abierto {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.badge-in-progress {
+  background-color: var(--warning-light);
+  color: #b45309;
+}
+
+.badge-cerrado {
+  background-color: var(--success-light);
+  color: var(--success);
+  font-weight: 600;
+  border: 2px solid var(--success);
+}
+
+.badge-high {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-medium {
+  background-color: var(--warning-light);
+  color: #b45309;
+}
+
+.badge-low {
+  background-color: #e0f2fe;
+  color: #0284c7;
+}
+
+.badge-active {
+  background-color: var(--success-light);
+  color: var(--success);
+}
+
+.badge-inactive {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   Client Ticket Items
+   ======================================== */
+
+.client-ticket-item {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--card);
+  transition: all 0.2s ease;
+}
+
+.client-ticket-item:hover {
+  background-color: var(--muted);
+  border-color: var(--primary-light);
+}
+
+.client-ticket-item.ticket-completed {
+  background-color: var(--success-light);
+  border-color: var(--success);
+  position: relative;
+}
+
+.client-ticket-item.ticket-completed::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--success);
+  border-radius: 2px 0 0 2px;
 }

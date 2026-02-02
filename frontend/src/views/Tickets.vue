@@ -10,7 +10,8 @@ import {
   MessageSquare,
   Clock,
   ExternalLink,
-  FileText
+  FileText,
+  CheckCircle
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -35,11 +36,17 @@ const filterStatus = ref('');
 const filterPriority = ref('');
 
 const handleCreateTicket = async () => {
+  console.log('Creando ticket con datos:', newTicket.value);
   try {
-    await store.createTicket(newTicket.value);
+    const createdTicket = await store.createTicket(newTicket.value);
+    console.log('Ticket creado:', createdTicket);
     showCreateModal.value = false;
     newTicket.value = { title: '', description: '', cliente: '', priority: 'media', tecnico: '' };
+    // Refrescar datos para que se actualicen todas las vistas
+    await store.fetchAll();
+    console.log('Datos refrescados después de crear ticket');
   } catch (error) {
+    console.error('Error al crear ticket:', error);
     alert('Error al crear el ticket');
   }
 };
@@ -71,6 +78,24 @@ const handleDeleteTicket = async (ticketId) => {
 
 const handleViewTicket = (ticket) => {
   router.push(`/tickets/${ticket._id}`);
+};
+
+const handleMarkAsCompleted = async (ticket) => {
+  if (confirm(`¿Marcar el ticket "${ticket.title}" como completado?`)) {
+    try {
+      await store.updateTicket(ticket._id, {
+        ...ticket,
+        status: 'cerrado',
+        endDate: new Date()
+      });
+      alert('Ticket marcado como completado');
+      // Refrescar datos para que se actualicen todas las vistas
+      await store.fetchAll();
+    } catch (error) {
+      console.error('Error al marcar como completado:', error);
+      alert(`Error al marcar como completado: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
+    }
+  }
 };
 </script>
 
@@ -116,9 +141,14 @@ const handleViewTicket = (ticket) => {
     </div>
 
     <div v-else class="card" style="padding: 1rem;">
-      <div v-for="ticket in store.tickets" :key="ticket._id" class="ticket-list-item">
+      <div v-for="ticket in store.tickets" :key="ticket._id" class="ticket-list-item" :class="{ 'ticket-completed': ticket.status === 'cerrado' }">
         <div class="ticket-info">
-          <div class="ticket-title">{{ ticket.title }}</div>
+          <div class="ticket-title">
+            {{ ticket.title }}
+            <span v-if="ticket.status === 'cerrado'" style="color: var(--success); font-size: 0.75rem; margin-left: 0.5rem;">
+              ✓ Completado
+            </span>
+          </div>
           <div class="ticket-meta">
             <span>#{{ ticket._id ? ticket._id.slice(-6).toUpperCase() : 'N/A' }}</span> • 
             <span>{{ ticket.cliente?.nombreEmpresa || 'Sin cliente' }}</span> • 
@@ -126,12 +156,16 @@ const handleViewTicket = (ticket) => {
               <Clock style="width: 12px; height: 12px;" />
               {{ ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A' }}
             </span>
+            <span v-if="ticket.endDate" style="margin-left: 0.5rem; color: var(--success);">
+              • Finalizado: {{ new Date(ticket.endDate).toLocaleDateString() }}
+            </span>
           </div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 1.5rem;">
           <div style="display: flex; gap: 0.5rem;">
             <span class="badge" :class="'badge-' + (ticket.status === 'en progreso' ? 'in-progress' : ticket.status)">
+              <CheckCircle v-if="ticket.status === 'cerrado'" style="width: 12px; height: 12px; margin-right: 0.25rem;" />
               {{ ticket.status }}
             </span>
             <span class="badge" :class="'badge-' + (ticket.priority === 'media' ? 'medium' : (ticket.priority === 'baja' ? 'low' : 'high'))">
@@ -144,6 +178,14 @@ const handleViewTicket = (ticket) => {
               <MessageSquare style="width: 14px; height: 14px;" />
               {{ ticket.messages?.length || 0 }}
             </div>
+            <button 
+              v-if="ticket.status !== 'cerrado'" 
+              @click="handleMarkAsCompleted(ticket)" 
+              class="btn btn-success btn-icon" 
+              title="Marcar como completado"
+            >
+              <CheckCircle style="width: 14px; height: 14px;" />
+            </button>
             <button @click="handleEditTicket(ticket)" class="btn btn-secondary btn-icon" title="Editar">
               <MessageSquare style="width: 14px; height: 14px;" />
             </button>
