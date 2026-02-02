@@ -35,16 +35,46 @@ const searchQuery = ref('');
 const filterStatus = ref('');
 const filterPriority = ref('');
 
+// Computed property para filtrar tickets
+const filteredTickets = computed(() => {
+  let tickets = store.tickets;
+
+  // Filtro por búsqueda de texto
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim();
+    tickets = tickets.filter(ticket => {
+      const title = ticket.title?.toLowerCase() || '';
+      const id = ticket._id?.toLowerCase() || '';
+      const clientName = ticket.cliente?.nombreEmpresa?.toLowerCase() || '';
+      const clientContact = ticket.cliente?.nombreContacto?.toLowerCase() || '';
+      
+      return title.includes(query) || 
+             id.includes(query) || 
+             clientName.includes(query) ||
+             clientContact.includes(query);
+    });
+  }
+
+  // Filtro por estado
+  if (filterStatus.value) {
+    tickets = tickets.filter(ticket => ticket.status === filterStatus.value);
+  }
+
+  // Filtro por prioridad
+  if (filterPriority.value) {
+    tickets = tickets.filter(ticket => ticket.priority === filterPriority.value);
+  }
+
+  return tickets;
+});
+
 const handleCreateTicket = async () => {
-  console.log('Creando ticket con datos:', newTicket.value);
   try {
     const createdTicket = await store.createTicket(newTicket.value);
-    console.log('Ticket creado:', createdTicket);
     showCreateModal.value = false;
     newTicket.value = { title: '', description: '', cliente: '', priority: 'media', tecnico: '' };
     // Refrescar datos para que se actualicen todas las vistas
     await store.fetchAll();
-    console.log('Datos refrescados después de crear ticket');
   } catch (error) {
     console.error('Error al crear ticket:', error);
     alert('Error al crear el ticket');
@@ -135,13 +165,26 @@ const handleMarkAsCompleted = async (ticket) => {
     </div>
 
     <!-- Lista de Tickets -->
-    <div v-if="store.tickets.length === 0" class="empty-state">
+    <div v-if="filteredTickets.length === 0" class="empty-state">
       <FileText style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
-      <p>No se encontraron tickets con los filtros actuales.</p>
+      <p v-if="store.tickets.length === 0">No hay tickets creados aún.</p>
+      <p v-else>No se encontraron tickets con los filtros actuales.</p>
+    </div>
+
+    <!-- Lista de Tickets -->
+    <div v-if="filteredTickets.length === 0" class="empty-state">
+      <FileText style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
+      <p v-if="store.tickets.length === 0">No hay tickets creados aún.</p>
+      <p v-else>No se encontraron tickets con los filtros actuales.</p>
     </div>
 
     <div v-else class="card" style="padding: 1rem;">
-      <div v-for="ticket in store.tickets" :key="ticket._id" class="ticket-list-item" :class="{ 'ticket-completed': ticket.status === 'cerrado' }">
+      <!-- Indicador de resultados filtrados -->
+      <div v-if="store.tickets.length > filteredTickets.length" style="padding: 0.75rem 1rem; background-color: var(--muted); border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.875rem; color: var(--muted-foreground);">
+        Mostrando {{ filteredTickets.length }} de {{ store.tickets.length }} tickets
+      </div>
+      
+      <div v-for="ticket in filteredTickets" :key="ticket._id" class="ticket-list-item" :class="{ 'ticket-completed': ticket.status === 'cerrado' }">
         <div class="ticket-info">
           <div class="ticket-title">
             {{ ticket.title }}

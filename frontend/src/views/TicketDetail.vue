@@ -69,7 +69,6 @@ const callTimerInterval = ref(null);
 const setRemoteVideoRef = (el) => {
   if (el) {
     remoteVideoRef.value = el;
-    console.log('🎥 Ref de video remoto asignado mediante función:', el);
   }
 };
 
@@ -125,7 +124,6 @@ onUnmounted(() => {
 });
 
 const initializeSocket = (ticketId) => {
-  console.log('🔌 Inicializando Socket.io...');
   socket.value = io('http://localhost:5001', {
     reconnection: true,
     reconnectionDelay: 1000,
@@ -133,20 +131,14 @@ const initializeSocket = (ticketId) => {
   });
 
   socket.value.on('connect', () => {
-    console.log('✅ Socket conectado. ID:', socket.value.id);
-    console.log('🔗 Uniéndose a la sala del ticket...');
     socket.value.emit('join-ticket-room', ticketId, {
       name: store.currentUser?.name || 'Usuario',
       role: store.currentUser?.role || 'cliente'
     });
-    console.log('✅ join-ticket-room emitido');
   });
 
   // Recibir nueva llamada entrante (solo para iniciar una nueva llamada)
   socket.value.on('incoming-call', async (data) => {
-    console.log('☎️ EVENTO: incoming-call recibido');
-    console.log('   Datos:', data);
-    console.log('   Llamada entrante de:', data.callerName);
     
     // Solo mostrar modal si no hay una llamada en curso
     if (!inCall.value) {
@@ -157,27 +149,16 @@ const initializeSocket = (ticketId) => {
 
   // Recibir oferta de renegotiación (durante una llamada en curso)
   socket.value.on('call-offer', async (data) => {
-    console.log('📞 EVENTO: call-offer recibido (posible renegotiation)');
-    console.log('   Datos:', data);
     
     // Si ya hay una llamada en curso y se recibe una oferta, es una renegotiación (screen share, etc)
     if (inCall.value && peerConnection.value) {
-      console.log('🔄 Renegotiación detectada - procesando oferta...');
       try {
-        console.log('📋 Estado actual:', {
-          signalingState: peerConnection.value.signalingState,
-          connectionState: peerConnection.value.connectionState,
-          iceConnectionState: peerConnection.value.iceConnectionState
-        });
-        
         // Establecer la oferta remota
         await peerConnection.value.setRemoteDescription(new RTCSessionDescription(data.offer));
-        console.log('✅ Oferta remota establecida');
         
         // Crear y enviar respuesta
         const answer = await peerConnection.value.createAnswer();
         await peerConnection.value.setLocalDescription(answer);
-        console.log('✅ Respuesta creada y establecida');
         
         // Enviar respuesta
         socket.value.emit('call-answer', {
@@ -185,24 +166,18 @@ const initializeSocket = (ticketId) => {
           answer: answer,
           to: data.from || remoteUserId.value
         });
-        console.log('📤 Respuesta de renegotiation enviada');
       } catch (err) {
         console.error('Error procesando renegotiation:', err);
-        console.error('Stack:', err.stack);
       }
     } else if (!inCall.value) {
       // Si no hay llamada en curso, es una nueva llamada (handling normal)
-      console.log('☎️ Nueva llamada detectada');
       incomingCallData.value = data;
       showIncomingCall.value = true;
-    } else {
-      console.error('⚠️ Condiciones no cumplidas:', { inCall: inCall.value, hasPeerConnection: !!peerConnection.value });
     }
   });
 
   // Respuesta a llamada
   socket.value.on('call-answered', async (data) => {
-    console.log('Llamada aceptada');
     remoteUserId.value = data.from;
     await handleAnswerReceived(data.answer);
   });
@@ -218,7 +193,6 @@ const initializeSocket = (ticketId) => {
 
   // Llamada rechazada
   socket.value.on('call-rejected', () => {
-    console.log('Llamada rechazada');
     inCall.value = false;
     alert('La llamada fue rechazada');
   });
@@ -277,27 +251,18 @@ const startCall = async (type) => {
     
     // PASO 2: Esperar a que Vue renderice el elemento video
     await nextTick();
-    console.log('✅ Vue renderizó el elemento video');
     
     // PASO 3: Solicitar stream según el tipo de llamada
-    console.log(`🎬 Solicitando acceso a ${type === 'voice' ? 'micrófono' : 'cámara y micrófono'}...`);
     const constraints = type === 'voice' 
       ? { audio: true, video: false }
       : { video: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, audio: true };
     
     localStream.value = await navigator.mediaDevices.getUserMedia(constraints);
 
-    console.log('✅ Stream local obtenido:', localStream.value);
-    console.log('🎥 Tracks:', localStream.value.getTracks());
-
     // PASO 4: Mostrar video local solo si es videollamada
     if (type === 'video' && localVideoRef.value) {
-      console.log('📹 Asignando video a elemento ref...');
       localVideoRef.value.srcObject = localStream.value;
       localVideoRef.value.play().catch(e => console.error('Error al reproducir:', e));
-      console.log('✅ Video local asignado');
-    } else if (type === 'video') {
-      console.error('❌ localVideoRef no está disponible!');
     }
 
     // PASO 5: Crear conexión peer
@@ -310,51 +275,33 @@ const startCall = async (type) => {
 
     // Manejar streams remotos
     peerConnection.value.ontrack = (event) => {
-      console.log('🎬 ONTRACK EVENT RECEIVED');
-      console.log('Track remoto recibido:', event.track.kind);
-      console.log('Track details:', { kind: event.track.kind, id: event.track.id, enabled: event.track.enabled });
-      console.log('Streams remotos:', event.streams);
-      console.log('callType.value:', callType.value);
       
       // Manejo de track de VIDEO remoto (screen share en llamadas de voz, o video en videollamadas)
       if (event.track.kind === 'video') {
-        console.log('📹 Procesando track de VIDEO');
         
         if (callType.value === 'voice') {
           // En llamada de voz, cualquier track de video es screen share
-          console.log('📺 Track de VIDEO en llamada de voz → Screen share remoto');
-          console.log('🔄 Estableciendo isRemoteSharingScreen = true');
           
           // Crear un MediaStream con el track de pantalla
           const screenStream = new MediaStream();
           screenStream.addTrack(event.track);
-          console.log('✅ MediaStream creado con track de pantalla');
-          console.log('📺 Track details:', { kind: event.track.kind, enabled: event.track.enabled });
-          console.log('📺 Tracks en el stream:', screenStream.getTracks());
           
           // IMPORTANTE: Primero activamos isRemoteSharingScreen para que Vue renderice el elemento
           isRemoteSharingScreen.value = true;
           
           // Luego esperamos a que Vue renderice
           nextTick(() => {
-            console.log('📺 nextTick ejecutado - elemento debería estar en DOM');
             
             if (remoteScreenVideoRef.value) {
-              console.log('📺 remoteScreenVideoRef ENCONTRADO, asignando srcObject...');
               remoteScreenVideoRef.value.srcObject = screenStream;
-              console.log('✅ srcObject asignado');
               
               // Intentar reproducir
               remoteScreenVideoRef.value.play()
-                .then(() => console.log('✅ Play() ejecutado'))
-                .catch(e => console.error('❌ Error en play():', e));
-            } else {
-              console.error('❌ remoteScreenVideoRef.value NO EXISTE');
+                .catch(e => console.error('Error en play():', e));
             }
           });
         } else if (callType.value === 'video') {
           // En videollamada, el track de video es de la cámara
-          console.log('🎥 Track de VIDEO en videollamada → Video remoto');
           
           if (event.streams && event.streams[0]) {
             remoteStream.value = event.streams[0];
@@ -363,7 +310,6 @@ const startCall = async (type) => {
               setTimeout(() => {
                 remoteVideoRef.value?.play().catch(e => console.error('Error:', e));
               }, 100);
-              console.log('✅ Video remoto asignado');
             }
           }
         }

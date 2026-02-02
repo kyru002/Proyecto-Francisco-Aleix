@@ -59,44 +59,28 @@ io.on("connection", (socket) => {
   socket.on("incoming-call", (data) => {
     const { ticketId, offer, callerName, callType } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`\n☎️ INCOMING-CALL RECIBIDO (Nueva llamada)`);
-    console.log(`   Caller: ${callerName}`);
-    console.log(`   Type: ${callType}`);
-    console.log(`   Room: ${room}`);
-    console.log(`   Socket ID: ${socket.id}`);
     
     // Enviar a todos en la sala EXCEPTO al que envia
-    console.log(`   📤 Emitiendo 'incoming-call' a otros...`);
     socket.broadcast.to(room).emit("incoming-call", {
       from: socket.id,
       callerName: callerName,
       callType: callType,
       offer: offer
     });
-    
-    console.log(`   ✅ Evento emitido\n`);
   });
 
   // Manejar oferta de renegotiación (durante una llamada en curso)
   socket.on("call-offer", (data) => {
     const { ticketId, offer, callerName, callType } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`\n🔄 CALL-OFFER RECIBIDO (Renegotiation)`);
-    console.log(`   Caller: ${callerName}`);
-    console.log(`   Type: ${callType}`);
-    console.log(`   Room: ${room}`);
-    console.log(`   Socket ID: ${socket.id}`);
     
     // Enviar a todos en la sala EXCEPTO al que envia
-    console.log(`   📤 Emitiendo 'call-offer' a otros...`);
     socket.broadcast.to(room).emit("call-offer", {
       from: socket.id,
       callerName: callerName,
       callType: callType,
       offer: offer
     });
-    
-    console.log(`   ✅ Evento emitido\n`);
   });
 
   // Manejar respuesta de videollamada
@@ -135,9 +119,8 @@ io.on("connection", (socket) => {
 
   // Screen share iniciado
   socket.on("screen-share-started", (data) => {
-    const { ticketId, from } = data;
+    const { ticketId } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`Usuario ${from} comenzó a compartir pantalla`);
     socket.broadcast.to(room).emit("screen-share-started", {
       from: socket.id
     });
@@ -145,9 +128,8 @@ io.on("connection", (socket) => {
 
   // Screen share detenido
   socket.on("screen-share-stopped", (data) => {
-    const { ticketId, from } = data;
+    const { ticketId } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`Usuario ${from} dejó de compartir pantalla`);
     socket.broadcast.to(room).emit("screen-share-stopped", {
       from: socket.id
     });
@@ -158,13 +140,6 @@ io.on("connection", (socket) => {
     try {
       const { callerSocketId, callerName, receiverSocketId, receiverName, ticketId, callType } = data;
       
-      console.log(`📞 Registrando inicio de llamada:`, {
-        caller: callerName,
-        receiver: receiverName,
-        type: callType,
-        ticket: ticketId
-      });
-
       const newCallLog = new CallLog({
         callerSocketId,
         callerName,
@@ -181,8 +156,6 @@ io.on("connection", (socket) => {
       // Almacenar el ID del CallLog para ambos usuarios
       activeCallLogs.set(callerSocketId, savedCallLog._id.toString());
       activeCallLogs.set(receiverSocketId, savedCallLog._id.toString());
-      
-      console.log(`✅ CallLog registrado:`, savedCallLog._id);
     } catch (error) {
       console.error("Error registrando inicio de llamada:", error);
     }
@@ -193,8 +166,6 @@ io.on("connection", (socket) => {
     try {
       const { callerSocketId, ticketId } = data;
       
-      console.log(`✅ Registrando aceptación de llamada`);
-      
       const callLogId = activeCallLogs.get(callerSocketId) || activeCallLogs.get(socket.id);
       
       if (callLogId) {
@@ -203,7 +174,6 @@ io.on("connection", (socket) => {
           { status: "aceptada" },
           { new: true }
         );
-        console.log(`✅ CallLog actualizado a "aceptada"`);
       }
     } catch (error) {
       console.error("Error registrando aceptación de llamada:", error);
@@ -214,8 +184,6 @@ io.on("connection", (socket) => {
   socket.on("call-rejected", async (data) => {
     try {
       const { callerSocketId } = data;
-      
-      console.log(`❌ Registrando rechazo de llamada`);
       
       const callLogId = activeCallLogs.get(callerSocketId) || activeCallLogs.get(socket.id);
       
@@ -231,7 +199,6 @@ io.on("connection", (socket) => {
         );
         activeCallLogs.delete(callerSocketId);
         activeCallLogs.delete(socket.id);
-        console.log(`✅ CallLog actualizado a "rechazada"`);
       }
     } catch (error) {
       console.error("Error registrando rechazo de llamada:", error);
@@ -242,8 +209,6 @@ io.on("connection", (socket) => {
   socket.on("call-ended", async (data) => {
     try {
       const { duration, screenShared } = data;
-      
-      console.log(`📞 Registrando término de llamada. Duración: ${duration}s, Screen shared: ${screenShared}`);
       
       const callLogId = activeCallLogs.get(socket.id);
       
@@ -265,8 +230,6 @@ io.on("connection", (socket) => {
             activeCallLogs.delete(key);
           }
         });
-        
-        console.log(`✅ CallLog registrado como completada. Duración total: ${updatedCallLog.duration}s`);
       }
     } catch (error) {
       console.error("Error registrando término de llamada:", error);
@@ -275,7 +238,6 @@ io.on("connection", (socket) => {
 
   // Desconexión
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
     io.emit("user-disconnected", {
       userId: socket.id
     });
