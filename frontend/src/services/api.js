@@ -46,4 +46,12 @@ export const albaranesService = {
     obtenerProximoNumero: () => api.get('/albaranes/numero/siguiente').then(res => res.data),
 };
 
+export const callLogsService = {
+    getAll: () => api.get('/callLogs').then(res => res.data),
+    getById: (id) => api.get(`/callLogs/${id}`).then(res => res.data),
+    getByTicket: (ticketId) => api.get(`/callLogs/ticket/${ticketId}`).then(res => res.data),
+    create: (data) => api.post('/callLogs', data).then(res => res.data),
+    update: (id, data) => api.patch(`/callLogs/${id}`, data).then(res => res.data),
+};
+
 export default api;
