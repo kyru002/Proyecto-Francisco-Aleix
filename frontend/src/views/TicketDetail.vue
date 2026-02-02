@@ -262,7 +262,22 @@ const startCall = async (type) => {
       return;
     }
     
-    // PASO 0: Iniciar temporizador de llamada
+    // PASO 0: Registrar inicio de llamada INMEDIATAMENTE
+    console.log(`\n📤 Emitiendo evento 'call-started'...`);
+    console.log('🔌 Socket status:', { connected: socket.value?.connected, id: socket.value?.id });
+    
+    socket.value.emit('call-started', {
+      callerSocketId: socket.value.id,
+      callerName: store.currentUser?.name || 'Usuario',
+      receiverSocketId: null,
+      receiverName: null,
+      ticketId: route.params.id,
+      callType: type
+    });
+    
+    console.log(`✅ Evento 'call-started' emitido correctamente\n`);
+    
+    // PASO 1: Iniciar temporizador de llamada
     callStartTime.value = new Date();
     callTimerInterval.value = setInterval(() => {
       if (callStartTime.value) {
@@ -270,16 +285,16 @@ const startCall = async (type) => {
       }
     }, 1000);
     
-    // PASO 1: Guardar tipo de llamada y mostrar el contenedor
+    // PASO 2: Guardar tipo de llamada y mostrar el contenedor
     callType.value = type;
     inCall.value = true;
     callInProgress.value = true;
     
-    // PASO 2: Esperar a que Vue renderice el elemento video
+    // PASO 3: Esperar a que Vue renderice el elemento video
     await nextTick();
     console.log('✅ Vue renderizó el elemento video');
     
-    // PASO 3: Solicitar stream según el tipo de llamada
+    // PASO 4: Solicitar stream según el tipo de llamada
     console.log(`🎬 Solicitando acceso a ${type === 'voice' ? 'micrófono' : 'cámara y micrófono'}...`);
     const constraints = type === 'voice' 
       ? { audio: true, video: false }
@@ -290,7 +305,7 @@ const startCall = async (type) => {
     console.log('✅ Stream local obtenido:', localStream.value);
     console.log('🎥 Tracks:', localStream.value.getTracks());
 
-    // PASO 4: Mostrar video local solo si es videollamada
+    // PASO 5: Mostrar video local solo si es videollamada
     if (type === 'video' && localVideoRef.value) {
       console.log('📹 Asignando video a elemento ref...');
       localVideoRef.value.srcObject = localStream.value;
@@ -300,7 +315,7 @@ const startCall = async (type) => {
       console.error('❌ localVideoRef no está disponible!');
     }
 
-    // PASO 5: Crear conexión peer
+    // PASO 6: Crear conexión peer
     peerConnection.value = new RTCPeerConnection({ iceServers: peerConfig.iceServers });
 
     // Agregar tracks locales
@@ -409,16 +424,6 @@ const startCall = async (type) => {
     const offer = await peerConnection.value.createOffer();
     await peerConnection.value.setLocalDescription(offer);
 
-    // Registrar inicio de llamada en el servidor
-    socket.value.emit('call-started', {
-      callerSocketId: socket.value.id,
-      callerName: store.currentUser?.name || 'Usuario',
-      receiverSocketId: null, // Se llenará cuando se acepte
-      receiverName: null,
-      ticketId: route.params.id,
-      callType: type
-    });
-
     // Enviar oferta inicial (nueva llamada, no renegotiation)
     socket.value.emit('incoming-call', {
       ticketId: route.params.id,
@@ -459,10 +464,25 @@ const acceptCall = async () => {
     
     // PASO 2.7: Registrar aceptación de llamada en el servidor
     if (socket.value) {
+      console.log(`\n📤 Emitiendo evento 'call-accepted'...`);
+      console.log('🔌 currentUser:', store.currentUser);
+      console.log('🔌 currentUser?.name:', store.currentUser?.name);
+      console.log('🔌 receiverName a enviar:', store.currentUser?.name || 'Usuario');
+      console.log('🔌 Datos a enviar:', JSON.stringify({
+        callerSocketId: remoteUserId.value,
+        receiverSocketId: socket.value.id,
+        receiverName: store.currentUser?.name || 'Usuario',
+        ticketId: route.params.id
+      }, null, 2));
+      
       socket.value.emit('call-accepted', {
         callerSocketId: remoteUserId.value,
+        receiverSocketId: socket.value.id,
+        receiverName: store.currentUser?.name || 'Usuario',
         ticketId: route.params.id
       });
+      
+      console.log(`✅ Evento 'call-accepted' emitido\n`);
     }
     
     // PASO 3: Esperar a que Vue renderice el elemento video

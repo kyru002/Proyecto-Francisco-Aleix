@@ -1,23 +1,19 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useAppStore } from '../stores/appStore';
 import { 
   Plus, 
   Search, 
   Mail, 
   Phone, 
-  Building2, 
-  MoreVertical,
+  Building2,
   Edit,
   Trash2,
-  ExternalLink,
   Users,
-  Ticket,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
-  Clock,
-  CheckCircle
+  Copy,
+  Lock
 } from 'lucide-vue-next';
 
 const store = useAppStore();
@@ -36,191 +32,430 @@ onMounted(async () => {
 const editingClient = ref(null);
 const showEditModal = ref(false);
 const expandedClientId = ref(null);
+const searchQuery = ref('');
+
+// Trabajadores
+const showTrabajadorModal = ref(false);
+const selectedClientForTrabajador = ref(null);
+const newTrabajador = ref({
+  nombre: '',
+  email: '',
+  telefono: '',
+  puesto: 'Técnico'
+});
+const editingTrabajador = ref(null);
+const showEditTrabajadorModal = ref(false);
+const showPasswordModal = ref(false);
+const passwordToCopy = ref('');
+const trabajadoresPorEmpresa = ref({});
+
+// Computadas
+const filteredClientes = computed(() => {
+  if (!searchQuery.value) return store.clientes;
+  const query = searchQuery.value.toLowerCase();
+  return store.clientes.filter(c =>
+    c.nombreEmpresa?.toLowerCase().includes(query) ||
+    c.nombreContacto?.toLowerCase().includes(query) ||
+    c.email?.toLowerCase().includes(query)
+  );
+});
+
+// Funciones para clientes
+const openCreateModal = () => {
+  newClient.value = {
+    nombreContacto: '',
+    nombreEmpresa: '',
+    email: '',
+    telefono: ''
+  };
+  showCreateModal.value = true;
+};
 
 const handleCreateClient = async () => {
+  if (!newClient.value.nombreContacto || !newClient.value.nombreEmpresa || !newClient.value.email) {
+    alert('Por favor completa todos los campos requeridos');
+    return;
+  }
   try {
     await store.createCliente(newClient.value);
     showCreateModal.value = false;
-    newClient.value = { nombreContacto: '', nombreEmpresa: '', email: '', telefono: '' };
-  } catch (error) {
-    alert('Error al crear el cliente');
+    alert('Empresa creada correctamente');
+  } catch (err) {
+    alert('Error al crear empresa: ' + err.message);
   }
 };
 
-const handleEditClient = (client) => {
+const editClient = (client) => {
   editingClient.value = { ...client };
   showEditModal.value = true;
 };
 
-const handleSaveEdit = async () => {
+const handleUpdateClient = async () => {
   try {
     await store.updateCliente(editingClient.value._id, editingClient.value);
     showEditModal.value = false;
-    editingClient.value = null;
-  } catch (error) {
-    alert('Error al actualizar el cliente');
+    alert('Empresa actualizada correctamente');
+  } catch (err) {
+    alert('Error al actualizar: ' + err.message);
   }
 };
 
-const handleViewClient = (client) => {
-  console.log('Ver cliente:', client);
+const handleDeleteClient = async (id) => {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta empresa?')) {
+    return;
+  }
+  try {
+    await store.deleteCliente(id);
+    alert('Empresa eliminada correctamente');
+  } catch (err) {
+    alert('Error al eliminar: ' + err.message);
+  }
 };
 
-const handleDeleteClient = async (clientId) => {
-  if (confirm('¿Estás seguro de que quieres eliminar este cliente?')) {
-    try {
-      await store.deleteCliente(clientId);
-      await store.fetchAll();
-    } catch (error) {
-      alert('Error al eliminar el cliente');
+const toggleExpand = async (clientId) => {
+  if (expandedClientId.value === clientId) {
+    expandedClientId.value = null;
+  } else {
+    expandedClientId.value = clientId;
+    // Cargar trabajadores de esta empresa
+    if (!trabajadoresPorEmpresa.value[clientId]) {
+      try {
+        const trabajadores = store.trabajadores.filter(t => {
+          const empresaId = t.empresa._id || t.empresa;
+          return empresaId === clientId || empresaId === String(clientId);
+        });
+        trabajadoresPorEmpresa.value[clientId] = trabajadores;
+      } catch (err) {
+        console.error('Error al cargar trabajadores:', err);
+        trabajadoresPorEmpresa.value[clientId] = [];
+      }
     }
   }
 };
 
-const toggleClientTickets = (clientId) => {
-  expandedClientId.value = expandedClientId.value === clientId ? null : clientId;
+// Funciones para trabajadores
+const openTrabajadorModal = (client) => {
+  selectedClientForTrabajador.value = client;
+  newTrabajador.value = {
+    nombre: '',
+    email: '',
+    telefono: '',
+    puesto: 'Técnico'
+  };
+  showTrabajadorModal.value = true;
 };
 
-const getClientTickets = (clientId) => {
-  console.log('Filtrando tickets para cliente:', clientId);
-  const filtered = store.tickets.filter(ticket => {
-    // ticket.cliente puede ser un string (ID) o un objeto poblado
-    const ticketClientId = typeof ticket.cliente === 'object' ? ticket.cliente?._id : ticket.cliente;
-    const match = String(ticketClientId) === String(clientId);
-    if (match) {
-      console.log('Ticket encontrado:', ticket.title, 'Cliente ID:', ticketClientId);
+const handleCreateTrabajador = async () => {
+  if (!newTrabajador.value.nombre || !newTrabajador.value.email || !newTrabajador.value.puesto) {
+    alert('Por favor completa todos los campos requeridos');
+    return;
+  }
+
+  try {
+    const trabajadorData = {
+      ...newTrabajador.value,
+      empresa: selectedClientForTrabajador.value._id
+    };
+    
+    const result = await store.createTrabajador(trabajadorData);
+    
+    // Recargar trabajadores de la empresa
+    const trabajadores = store.trabajadores.filter(t => {
+      const empresaId = t.empresa._id || t.empresa;
+      return empresaId === selectedClientForTrabajador.value._id || 
+             empresaId === String(selectedClientForTrabajador.value._id);
+    });
+    trabajadoresPorEmpresa.value[selectedClientForTrabajador.value._id] = trabajadores;
+    
+    // Mostrar modal con contraseña temporal
+    if (result.contraseñaTemporalTexto) {
+      passwordToCopy.value = result.contraseñaTemporalTexto;
+      showPasswordModal.value = true;
     }
-    return match;
-  });
-  console.log('Total tickets encontrados:', filtered.length);
-  return filtered;
+    
+    showTrabajadorModal.value = false;
+  } catch (err) {
+    alert('Error al crear trabajador: ' + err.message);
+  }
+};
+
+const editTrabajador = (trabajador) => {
+  editingTrabajador.value = { ...trabajador };
+  showEditTrabajadorModal.value = true;
+};
+
+const handleUpdateTrabajador = async () => {
+  try {
+    await store.updateTrabajador(editingTrabajador.value._id, editingTrabajador.value);
+    
+    // Recargar trabajadores
+    const trabajadores = store.trabajadores.filter(t => {
+      const empresaId = t.empresa._id || t.empresa;
+      return empresaId === selectedClientForTrabajador.value._id;
+    });
+    trabajadoresPorEmpresa.value[selectedClientForTrabajador.value._id] = trabajadores;
+    
+    showEditTrabajadorModal.value = false;
+    alert('Trabajador actualizado correctamente');
+  } catch (err) {
+    alert('Error al actualizar: ' + err.message);
+  }
+};
+
+const handleDeleteTrabajador = async (trabajadorId, empresaId) => {
+  if (!confirm('¿Estás seguro de que deseas eliminar este trabajador?')) {
+    return;
+  }
+  try {
+    await store.deleteTrabajador(trabajadorId);
+    
+    // Recargar trabajadores
+    const trabajadores = store.trabajadores.filter(t => {
+      const tEmpresaId = t.empresa._id || t.empresa;
+      return tEmpresaId === empresaId || tEmpresaId === String(empresaId);
+    });
+    trabajadoresPorEmpresa.value[empresaId] = trabajadores;
+    
+    alert('Trabajador eliminado correctamente');
+  } catch (err) {
+    alert('Error al eliminar: ' + err.message);
+  }
+};
+
+const copyPassword = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('Contraseña copiada al portapapeles');
+  } catch (err) {
+    alert('Error al copiar: ' + err.message);
+  }
+};
+
+const getTrabajadoresEmpresa = (clientId) => {
+  return trabajadoresPorEmpresa.value[clientId] || [];
 };
 </script>
 
 <template>
   <div class="page-content">
+    <!-- Header -->
     <div class="page-header">
-      <div>
-        <h1 class="page-title">Clientes</h1>
-        <p class="page-subtitle">Gestiona tu cartera de clientes y empresas</p>
-      </div>
-      <button @click="showCreateModal = true" class="btn btn-primary">
-        <Plus />
-        Nuevo Cliente
+      <h1 class="page-title">Empresas</h1>
+      <button @click="openCreateModal" class="btn btn-primary">
+        <Plus style="width: 18px; height: 18px;" />
+        Nueva Empresa
       </button>
     </div>
 
-    <!-- Filtros (Simplificados para la migración) -->
-    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
-      <div class="input-with-icon">
-        <Search />
-        <input type="text" class="form-input" placeholder="Buscar clientes...">
-      </div>
+    <!-- Search Bar -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <input
+        v-model="searchQuery"
+        type="text"
+        class="form-input"
+        placeholder="Buscar por nombre de empresa, contacto o email..."
+        style="margin: 0;"
+      />
     </div>
 
-    <!-- Grid de Clientes -->
-    <div v-if="store.loading" class="empty-state">
-      <p>Cargando clientes...</p>
-    </div>
-    
-    <div v-else-if="store.clientes.length === 0" class="empty-state">
-      <Users />
-      <p class="empty-state-text">No hay clientes registrados.</p>
+    <!-- Clientes Grid -->
+    <div v-if="filteredClientes.length === 0" class="empty-state">
+      <Building2 style="width: 48px; height: 48px;" />
+      <p class="empty-state-text">No hay empresas registradas</p>
     </div>
 
-    <div v-else class="clients-grid">
-      <div v-for="client in store.clientes" :key="client._id" class="card client-card">
-        <div class="client-card-header">
-          <div class="client-icon">
-            <Building2 />
+    <div v-else style="display: grid; gap: 1rem;">
+      <div
+        v-for="cliente in filteredClientes"
+        :key="cliente._id"
+        class="card"
+        style="overflow: hidden;"
+      >
+        <!-- Header de Empresa -->
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1.5rem;
+          cursor: pointer;
+          background-color: var(--background);
+          border-bottom: 1px solid var(--border);
+        "
+        @click="toggleExpand(cliente._id)"
+        >
+          <div style="flex: 1; display: flex; align-items: center; gap: 1rem;">
+            <div style="
+              width: 48px;
+              height: 48px;
+              background-color: var(--primary-light);
+              border-radius: 0.5rem;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: var(--primary);
+              flex-shrink: 0;
+            ">
+              <Building2 style="width: 24px; height: 24px;" />
+            </div>
+            
+            <div style="flex: 1; min-width: 0;">
+              <h3 style="margin: 0 0 0.25rem 0; font-weight: 600;">{{ cliente.nombreEmpresa }}</h3>
+              <p style="margin: 0; font-size: 0.875rem; color: var(--muted-foreground);">
+                {{ cliente.nombreContacto }} • {{ cliente.email }}
+              </p>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                <span v-if="cliente.telefono" style="
+                  font-size: 0.75rem;
+                  color: var(--muted-foreground);
+                  display: flex;
+                  align-items: center;
+                  gap: 0.25rem;
+                ">
+                  <Phone style="width: 14px; height: 14px;" />
+                  {{ cliente.telefono }}
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="client-tickets">
-            <Ticket style="width: 14px; height: 14px;" />
-            {{ getClientTickets(client._id).length }} Tickets
-          </div>
-        </div>
-        
-        <h3 class="client-company truncate">{{ client.nombreEmpresa }}</h3>
-        <p class="client-name">{{ client.nombreContacto }}</p>
 
-        <div class="client-details">
-          <div class="client-detail">
-            <Mail />
-            <span class="truncate">{{ client.email }}</span>
-          </div>
-          <div class="client-detail">
-            <Phone />
-            <span>{{ client.telefono }}</span>
-          </div>
-        </div>
-
-        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-          <button @click="handleEditClient(client)" class="btn btn-secondary btn-icon" title="Editar">
-            <Edit />
-          </button>
-          <button @click="handleDeleteClient(client._id)" class="btn btn-ghost btn-icon" title="Eliminar">
-            <Trash2 />
-          </button>
-          <button 
-            @click="toggleClientTickets(client._id)" 
-            class="btn btn-ghost btn-icon" 
-            :title="expandedClientId === client._id ? 'Ocultar tickets' : 'Ver tickets'"
-            style="margin-left: auto;"
-          >
-            <ChevronDown v-if="expandedClientId !== client._id" />
-            <ChevronUp v-else />
-          </button>
-        </div>
-
-        <!-- Tickets del cliente (expandible) -->
-        <div v-if="expandedClientId === client._id" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-          <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--foreground);">
-            Tickets del cliente ({{ getClientTickets(client._id).length }})
-          </h4>
-          
-          <div v-if="getClientTickets(client._id).length === 0" style="text-align: center; padding: 1rem; color: var(--muted-foreground);">
-            <Ticket style="width: 24px; height: 24px; opacity: 0.5; margin-bottom: 0.5rem;" />
-            <p style="font-size: 0.875rem;">No hay tickets registrados para este cliente</p>
-          </div>
-          
-          <div v-else style="display: flex; flex-direction: column; gap: 0.5rem;">
-            <div 
-              v-for="ticket in getClientTickets(client._id)" 
-              :key="ticket._id"
-              class="client-ticket-item"
-              :class="{ 'ticket-completed': ticket.status === 'cerrado' }"
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <div style="text-align: right;">
+              <div style="font-weight: 600; color: var(--primary); font-size: 1.125rem;">
+                {{ getTrabajadoresEmpresa(cliente._id).length }}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted-foreground);">trabajadores</div>
+            </div>
+            
+            <button
+              @click.stop="editClient(cliente)"
+              class="btn btn-ghost btn-icon"
+              title="Editar empresa"
             >
-              <div style="display: flex; align-items: center; justify-content: space-between;">
+              <Edit style="width: 18px; height: 18px;" />
+            </button>
+            
+            <button
+              @click.stop="handleDeleteClient(cliente._id)"
+              class="btn btn-ghost btn-icon"
+              title="Eliminar empresa"
+              style="color: var(--destructive);"
+            >
+              <Trash2 style="width: 18px; height: 18px;" />
+            </button>
+
+            <div :style="{ transform: expandedClientId === cliente._id ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }">
+              <ChevronDown style="width: 20px; height: 20px; color: var(--muted-foreground);" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Detalles Expandidos -->
+        <div v-if="expandedClientId === cliente._id" style="
+          padding: 1.5rem;
+          background-color: var(--muted);
+          border-top: 1px solid var(--border);
+        ">
+          <!-- Trabajadores Section -->
+          <div style="margin-bottom: 1.5rem;">
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 1rem;
+            ">
+              <h4 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <Users style="width: 18px; height: 18px;" />
+                Trabajadores de {{ cliente.nombreEmpresa }}
+              </h4>
+              <button
+                @click="openTrabajadorModal(cliente)"
+                class="btn btn-primary"
+                style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+              >
+                <Plus style="width: 16px; height: 16px;" />
+                Añadir Trabajador
+              </button>
+            </div>
+
+            <!-- Lista de Trabajadores -->
+            <div v-if="getTrabajadoresEmpresa(cliente._id).length === 0" style="
+              padding: 1rem;
+              text-align: center;
+              color: var(--muted-foreground);
+              border-radius: 0.5rem;
+              background-color: var(--background);
+            ">
+              <Users style="width: 32px; height: 32px; opacity: 0.3; margin-bottom: 0.5rem;" />
+              <p style="margin: 0;">No hay trabajadores asignados aún</p>
+            </div>
+
+            <div v-else style="display: flex; flex-direction: column; gap: 0.75rem;">
+              <div
+                v-for="trabajador in getTrabajadoresEmpresa(cliente._id)"
+                :key="trabajador._id"
+                style="
+                  padding: 1rem;
+                  background-color: var(--background);
+                  border-radius: 0.5rem;
+                  border: 1px solid var(--border);
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  gap: 1rem;
+                "
+              >
                 <div style="flex: 1; min-width: 0;">
-                  <div style="font-weight: 500; font-size: 0.875rem; margin-bottom: 0.25rem; color: var(--foreground);">
-                    {{ ticket.title }}
-                    <span v-if="ticket.status === 'cerrado'" style="color: var(--success); font-size: 0.75rem; margin-left: 0.5rem;">
-                      ✓ Completado
+                  <div style="font-weight: 500; margin-bottom: 0.25rem;">{{ trabajador.nombre }}</div>
+                  <div style="
+                    font-size: 0.875rem;
+                    color: var(--muted-foreground);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                  ">
+                    <span style="display: flex; align-items: center; gap: 0.25rem;">
+                      <Mail style="width: 14px; height: 14px;" />
+                      {{ trabajador.email }}
                     </span>
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--muted-foreground);">
-                    #{{ ticket._id.slice(-6).toUpperCase() }} • 
-                    {{ ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A' }}
-                    <span v-if="ticket.endDate" style="margin-left: 0.5rem; color: var(--success);">
-                      • Finalizado: {{ new Date(ticket.endDate).toLocaleDateString() }}
+                    <span v-if="trabajador.puesto" style="
+                      background-color: var(--primary-light);
+                      color: var(--primary);
+                      padding: 0.2rem 0.5rem;
+                      border-radius: 3px;
+                      font-size: 0.75rem;
+                    ">{{ trabajador.puesto }}</span>
+                    <span v-if="trabajador.contraseñaTemporal" style="
+                      background-color: #fef3c7;
+                      color: #b45309;
+                      padding: 0.2rem 0.5rem;
+                      border-radius: 3px;
+                      font-size: 0.75rem;
+                      display: flex;
+                      align-items: center;
+                      gap: 0.25rem;
+                    ">
+                      <Lock style="width: 12px; height: 12px;" />
+                      Contraseña temporal
                     </span>
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 1rem;">
-                  <span class="badge" :class="'badge-' + (ticket.status === 'en progreso' ? 'in-progress' : ticket.status)">
-                    <CheckCircle v-if="ticket.status === 'cerrado'" style="width: 10px; height: 10px; margin-right: 0.25rem;" />
-                    {{ ticket.status }}
-                  </span>
-                  <span class="badge" :class="'badge-' + (ticket.priority === 'media' ? 'medium' : (ticket.priority === 'baja' ? 'low' : 'high'))">
-                    {{ ticket.priority }}
-                  </span>
-                  <button 
-                    @click="$router.push(`/tickets/${ticket._id}`)" 
-                    class="btn btn-ghost btn-icon" 
-                    title="Ver ticket"
-                    style="padding: 0.25rem;"
+
+                <div style="display: flex; gap: 0.5rem;">
+                  <button
+                    @click="editTrabajador(trabajador)"
+                    class="btn btn-ghost btn-icon"
+                    title="Editar trabajador"
                   >
-                    <ExternalLink style="width: 14px; height: 14px;" />
+                    <Edit style="width: 16px; height: 16px;" />
+                  </button>
+                  <button
+                    @click="handleDeleteTrabajador(trabajador._id, cliente._id)"
+                    class="btn btn-ghost btn-icon"
+                    style="color: var(--destructive);"
+                    title="Eliminar trabajador"
+                  >
+                    <Trash2 style="width: 16px; height: 16px;" />
                   </button>
                 </div>
               </div>
@@ -230,70 +465,240 @@ const getClientTickets = (clientId) => {
       </div>
     </div>
 
-    <!-- Modal de Edición -->
-    <div v-if="showEditModal" class="modal-overlay">
+    <!-- Modal Crear Empresa -->
+    <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
       <div class="modal">
         <div class="modal-header">
-          <h2 class="modal-title">Editar Cliente</h2>
+          <h2 class="modal-title">Nueva Empresa</h2>
         </div>
-        <form @submit.prevent="handleSaveEdit" v-if="editingClient">
-          <div class="modal-body">
+        <div class="modal-body">
+          <form @submit.prevent="handleCreateClient">
             <div class="form-group">
-              <label class="form-label">Nombre de Contacto</label>
-              <input v-model="editingClient.nombreContacto" type="text" class="form-input" required placeholder="Ej: Juan Pérez">
+              <label class="form-label">Nombre de la Empresa *</label>
+              <input v-model="newClient.nombreEmpresa" type="text" class="form-input" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Nombre de la Empresa</label>
-              <input v-model="editingClient.nombreEmpresa" type="text" class="form-input" required placeholder="Ej: Acme Corp">
+              <label class="form-label">Nombre de Contacto Principal *</label>
+              <input v-model="newClient.nombreContacto" type="text" class="form-input" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Correo Electrónico</label>
-              <input v-model="editingClient.email" type="email" class="form-input" required placeholder="correo@empresa.com">
+              <label class="form-label">Email *</label>
+              <input v-model="newClient.email" type="email" class="form-input" required />
             </div>
             <div class="form-group">
               <label class="form-label">Teléfono</label>
-              <input v-model="editingClient.telefono" type="tel" class="form-input" placeholder="+34 600 000 000">
+              <input v-model="newClient.telefono" type="tel" class="form-input" />
             </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" @click="showEditModal = false" class="btn btn-secondary">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-          </div>
-        </form>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button @click="showCreateModal = false" class="btn btn-secondary">Cancelar</button>
+          <button @click="handleCreateClient" class="btn btn-primary">Crear Empresa</button>
+        </div>
       </div>
     </div>
 
-    <!-- Modal de Creación -->
-    <div v-if="showCreateModal" class="modal-overlay">
+    <!-- Modal Editar Empresa -->
+    <div v-if="showEditModal && editingClient" class="modal-overlay" @click.self="showEditModal = false">
       <div class="modal">
         <div class="modal-header">
-          <h2 class="modal-title">Registrar Nuevo Cliente</h2>
+          <h2 class="modal-title">Editar Empresa</h2>
         </div>
-        <form @submit.prevent="handleCreateClient">
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">Nombre de Contacto</label>
-              <input v-model="newClient.nombreContacto" type="text" class="form-input" required placeholder="Ej: Juan Pérez">
-            </div>
+        <div class="modal-body">
+          <form @submit.prevent="handleUpdateClient">
             <div class="form-group">
               <label class="form-label">Nombre de la Empresa</label>
-              <input v-model="newClient.nombreEmpresa" type="text" class="form-input" required placeholder="Ej: Acme Corp">
+              <input v-model="editingClient.nombreEmpresa" type="text" class="form-input" />
             </div>
             <div class="form-group">
-              <label class="form-label">Correo Electrónico</label>
-              <input v-model="newClient.email" type="email" class="form-input" required placeholder="correo@empresa.com">
+              <label class="form-label">Nombre de Contacto</label>
+              <input v-model="editingClient.nombreContacto" type="text" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input v-model="editingClient.email" type="email" class="form-input" />
             </div>
             <div class="form-group">
               <label class="form-label">Teléfono</label>
-              <input v-model="newClient.telefono" type="tel" class="form-input" placeholder="+34 600 000 000">
+              <input v-model="editingClient.telefono" type="tel" class="form-input" />
             </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button @click="showEditModal = false" class="btn btn-secondary">Cancelar</button>
+          <button @click="handleUpdateClient" class="btn btn-primary">Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Crear Trabajador -->
+    <div v-if="showTrabajadorModal && selectedClientForTrabajador" class="modal-overlay" @click.self="showTrabajadorModal = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Nuevo Trabajador - {{ selectedClientForTrabajador.nombreEmpresa }}</h2>
+        </div>
+        <div class="modal-body">
+          <form @submit.prevent="handleCreateTrabajador">
+            <div class="form-group">
+              <label class="form-label">Nombre Completo *</label>
+              <input v-model="newTrabajador.nombre" type="text" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email *</label>
+              <input v-model="newTrabajador.email" type="email" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input v-model="newTrabajador.telefono" type="tel" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Puesto *</label>
+              <select v-model="newTrabajador.puesto" class="form-input form-select" required>
+                <option value="Técnico">Técnico</option>
+                <option value="Gerente">Gerente</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Administrativo">Administrativo</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button @click="showTrabajadorModal = false" class="btn btn-secondary">Cancelar</button>
+          <button @click="handleCreateTrabajador" class="btn btn-primary">Crear Trabajador</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Editar Trabajador -->
+    <div v-if="showEditTrabajadorModal && editingTrabajador" class="modal-overlay" @click.self="showEditTrabajadorModal = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Editar Trabajador</h2>
+        </div>
+        <div class="modal-body">
+          <form @submit.prevent="handleUpdateTrabajador">
+            <div class="form-group">
+              <label class="form-label">Nombre Completo</label>
+              <input v-model="editingTrabajador.nombre" type="text" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input v-model="editingTrabajador.email" type="email" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input v-model="editingTrabajador.telefono" type="tel" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Puesto</label>
+              <select v-model="editingTrabajador.puesto" class="form-input form-select">
+                <option value="Técnico">Técnico</option>
+                <option value="Gerente">Gerente</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Administrativo">Administrativo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select v-model="editingTrabajador.estado" class="form-input form-select">
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+                <option value="suspendido">Suspendido</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button @click="showEditTrabajadorModal = false" class="btn btn-secondary">Cancelar</button>
+          <button @click="handleUpdateTrabajador" class="btn btn-primary">Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Mostrar Contraseña Temporal -->
+    <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Contraseña Temporal Generada</h2>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+          <div style="
+            background-color: var(--muted);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--primary-light);
+          ">
+            <p style="color: var(--muted-foreground); margin-bottom: 0.5rem; font-size: 0.875rem;">
+              Contraseña temporal (guárdala en un lugar seguro):
+            </p>
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 0.5rem;
+              background-color: var(--background);
+              padding: 0.75rem 1rem;
+              border-radius: 0.5rem;
+              font-weight: 600;
+              font-family: monospace;
+              margin-bottom: 1rem;
+            ">
+              <span style="flex: 1; word-break: break-all;">{{ passwordToCopy }}</span>
+              <button
+                @click="copyPassword(passwordToCopy)"
+                class="btn btn-primary btn-icon"
+                title="Copiar al portapapeles"
+              >
+                <Copy style="width: 16px; height: 16px;" />
+              </button>
+            </div>
+            <p style="color: var(--muted-foreground); font-size: 0.875rem; margin: 0;">
+              El trabajador deberá cambiarla en su primer acceso.
+            </p>
           </div>
-          <div class="modal-footer">
-            <button type="button" @click="showCreateModal = false" class="btn btn-secondary">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar Cliente</button>
-          </div>
-        </form>
+        </div>
+        <div class="modal-footer">
+          <button @click="showPasswordModal = false" class="btn btn-primary">Entendido</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.ticket-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  background-color: var(--card);
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.ticket-list-item:hover {
+  background-color: var(--muted);
+}
+
+.message-item {
+  padding: 0.75rem;
+  background-color: var(--background);
+  border-radius: 6px;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

@@ -28,6 +28,7 @@ app.use("/api/tecnicos", require("./routes/tecnicos"));
 app.use("/api/clientes", require("./routes/clientes"));
 app.use("/api/albaranes", require("./routes/albaranes"));
 app.use("/api/callLogs", require("./routes/callLogs"));
+app.use("/api/trabajadores", require("./routes/trabajadores"));
 
 // Ruta inicial
 app.get("/", (req, res) => {
@@ -40,6 +41,23 @@ const activeCallLogs = new Map(); // Mapeo de socket ID a CallLog ID para tracki
 
 io.on("connection", (socket) => {
   console.log("Nuevo cliente conectado:", socket.id);
+
+  // DEBUG: Capturar todos los eventos socket para diagnosticar
+  const originalOn = socket.on.bind(socket);
+  socket.on = function(event, ...args) {
+    if (!['disconnect'].includes(event)) {
+      console.log(`📡 Listener registrado para evento: "${event}"`);
+    }
+    return originalOn(event, ...args);
+  };
+
+  // DEBUG: Log de todos los eventos emitidos al socket
+  socket.onevent = (packet) => {
+    const args = packet.data || [];
+    const eventName = args[0];
+    console.log(`📨 SOCKET EMITIÓ EVENTO: "${eventName}"`, args.slice(1));
+    socket.__proto__.onevent.call(socket, packet);
+  };
 
   // Unirse a sala de ticket
   socket.on("join-ticket-room", (ticketId, userData) => {
@@ -155,6 +173,9 @@ io.on("connection", (socket) => {
 
   // Registrar inicio de llamada
   socket.on("call-started", async (data) => {
+    console.log(`\n🔔 EVENTO RECIBIDO: call-started (socket: ${socket.id})`);
+    console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
+    
     try {
       const { callerSocketId, callerName, receiverSocketId, receiverName, ticketId, callType } = data;
       
@@ -168,8 +189,8 @@ io.on("connection", (socket) => {
       const newCallLog = new CallLog({
         callerSocketId,
         callerName,
-        receiverSocketId,
-        receiverName,
+        receiverSocketId: receiverSocketId || null,
+        receiverName: receiverName || null,
         ticket: ticketId || null,
         callType,
         status: "iniciada",
@@ -178,35 +199,47 @@ io.on("connection", (socket) => {
 
       const savedCallLog = await newCallLog.save();
       
-      // Almacenar el ID del CallLog para ambos usuarios
+      // Almacenar el ID del CallLog SOLO para el caller (receiver se añadirá cuando acepte)
       activeCallLogs.set(callerSocketId, savedCallLog._id.toString());
-      activeCallLogs.set(receiverSocketId, savedCallLog._id.toString());
       
-      console.log(`✅ CallLog registrado:`, savedCallLog._id);
+      console.log(`✅ CallLog registrado (ID: ${savedCallLog._id}) - esperando aceptación de ${receiverName || 'receptor'}\n`);
     } catch (error) {
-      console.error("Error registrando inicio de llamada:", error);
+      console.error("❌ Error registrando inicio de llamada:", error);
+      console.error('Stack:', error.stack);
     }
   });
 
   // Registrar aceptación de llamada
   socket.on("call-accepted", async (data) => {
+    console.log(`\n✅ EVENTO RECIBIDO: call-accepted (socket: ${socket.id})`);
+    console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
+    
     try {
-      const { callerSocketId, ticketId } = data;
+      const { callerSocketId, receiverSocketId, receiverName, ticketId } = data;
       
-      console.log(`✅ Registrando aceptación de llamada`);
+      console.log(`✅ Registrando aceptación de llamada por socket: ${socket.id}`);
       
-      const callLogId = activeCallLogs.get(callerSocketId) || activeCallLogs.get(socket.id);
+      const callLogId = activeCallLogs.get(callerSocketId);
       
       if (callLogId) {
-        await CallLog.findByIdAndUpdate(
+        const updatedCallLog = await CallLog.findByIdAndUpdate(
           callLogId,
-          { status: "aceptada" },
+          { 
+            status: "aceptada",
+            receiverSocketId: receiverSocketId || socket.id,
+            receiverName: receiverName || 'Usuario'
+          },
           { new: true }
         );
-        console.log(`✅ CallLog actualizado a "aceptada"`);
+        // Ahora registrar también en el Map para el receiver
+        activeCallLogs.set(socket.id, callLogId);
+        console.log(`✅ CallLog (${callLogId}) actualizado a "aceptada" por ${socket.id}\n`);
+      } else {
+        console.warn(`⚠️ No se encontró CallLog para callerSocketId: ${callerSocketId}`);
       }
     } catch (error) {
-      console.error("Error registrando aceptación de llamada:", error);
+      console.error("❌ Error registrando aceptación de llamada:", error);
+      console.error('Stack:', error.stack);
     }
   });
 

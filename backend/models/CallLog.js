@@ -12,11 +12,13 @@ const CallLogSchema = new mongoose.Schema({
   },
   receiverSocketId: {
     type: String,
-    required: true
+    required: false,
+    default: null
   },
   receiverName: {
     type: String,
-    required: true
+    required: false,
+    default: null
   },
 
   // Ticket asociado

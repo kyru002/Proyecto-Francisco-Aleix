@@ -16,13 +16,18 @@ const route = useRoute();
 const router = useRouter();
 const store = useAppStore();
 
-const navItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Tickets', path: '/tickets', icon: Ticket },
-  { name: 'Albaranes', path: '/albaranes', icon: FileText },
-  { name: 'Equipo', path: '/technicians', icon: Users },
-  { name: 'Clientes', path: '/clients', icon: Users },
+const allNavItems = [
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'tecnico', 'cliente'] },
+  { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['admin', 'tecnico', 'cliente'] },
+  { name: 'Albaranes', path: '/albaranes', icon: FileText, roles: ['admin', 'tecnico', 'cliente'] },
+  { name: 'Equipo', path: '/technicians', icon: Users, roles: ['admin', 'tecnico'] },
+  { name: 'Clientes', path: '/clients', icon: Users, roles: ['admin', 'tecnico'] },
 ];
+
+const navItems = computed(() => {
+  const userRole = store.currentUser?.role || 'cliente';
+  return allNavItems.filter(item => item.roles.includes(userRole));
+});
 
 const handleLogout = () => {
   store.logout();

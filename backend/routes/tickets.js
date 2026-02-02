@@ -5,7 +5,15 @@ const Ticket = require("../models/Ticket");
 // Obtener todos los tickets
 router.get("/", async (req, res) => {
     try {
-        const tickets = await Ticket.find()
+        const { clienteId } = req.query;
+        
+        // Construir filtro
+        const filter = {};
+        if (clienteId) {
+            filter.cliente = clienteId;
+        }
+        
+        const tickets = await Ticket.find(filter)
             .populate('cliente')
             .populate('tecnico')
             .sort({ createdAt: -1 });

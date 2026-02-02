@@ -53,7 +53,11 @@ router.get("/cliente/:clienteId", async (req, res) => {
 // Obtener todos los albaranes
 router.get("/", async (req, res) => {
     try {
-        const albaranes = await Albarani.find()
+        const { cliente } = req.query;
+        const filter = {};
+        if (cliente) filter.cliente = cliente;
+        
+        const albaranes = await Albarani.find(filter)
             .populate('cliente')
             .populate('tecnico')
             .populate('ticket')

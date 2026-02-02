@@ -14,9 +14,9 @@ const error = ref('');
 const handleLogin = () => {
   // Simulación de login - múltiples cuentas de prueba
   const users = {
-    'admin@support.com': { id: "1", name: "Admin Usuario", role: "admin", password: "admin123" },
-    'tecnico@support.com': { id: "2", name: "Juan García (Técnico)", role: "tecnico", password: "tecnico123" },
-    'cliente@support.com': { id: "3", name: "María López (Cliente)", role: "cliente", password: "cliente123" }
+    'admin@support.com': { id: "1", name: "Admin Usuario", role: "admin", password: "admin123", clienteId: null },
+    'tecnico@support.com': { id: "2", name: "Juan García (Técnico)", role: "tecnico", password: "tecnico123", clienteId: null },
+    'cliente@support.com': { id: "3", name: "María López (Cliente)", role: "cliente", password: "cliente123", clienteId: "697fd860d39080019956aa07" }
   };
 
   const user = users[email.value];
@@ -26,7 +26,8 @@ const handleLogin = () => {
       id: user.id,
       name: user.name,
       email: email.value,
-      role: user.role
+      role: user.role,
+      clienteId: user.clienteId
     });
     router.push('/dashboard');
   } else {

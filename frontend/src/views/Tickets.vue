@@ -106,7 +106,7 @@ const handleMarkAsCompleted = async (ticket) => {
         <h1 class="page-title">Tickets de Soporte</h1>
         <p class="page-subtitle">Gestiona y responde a las solicitudes de ayuda</p>
       </div>
-      <button @click="showCreateModal = true" class="btn btn-primary">
+      <button v-if="store.currentUser?.role !== 'cliente'" @click="showCreateModal = true" class="btn btn-primary">
         <Plus />
         Nuevo Ticket
       </button>

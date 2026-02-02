@@ -10,7 +10,10 @@ const api = axios.create({
 });
 
 export const ticketsService = {
-    getAll: () => api.get('/tickets').then(res => res.data),
+    getAll: (params) => {
+        const config = params ? { params } : {};
+        return api.get('/tickets', config).then(res => res.data);
+    },
     getById: (id) => api.get(`/tickets/${id}`).then(res => res.data),
     create: (data) => api.post('/tickets', data).then(res => res.data),
     update: (id, data) => api.put(`/tickets/${id}`, data).then(res => res.data),
@@ -33,8 +36,22 @@ export const clientesService = {
     delete: (id) => api.delete(`/clientes/${id}`).then(res => res.data),
 };
 
+export const trabajadoresService = {
+    getAll: () => api.get('/trabajadores').then(res => res.data),
+    getByEmpresa: (empresaId) => api.get(`/trabajadores/empresa/${empresaId}`).then(res => res.data),
+    getById: (id) => api.get(`/trabajadores/${id}`).then(res => res.data),
+    create: (data) => api.post('/trabajadores', data).then(res => res.data),
+    update: (id, data) => api.put(`/trabajadores/${id}`, data).then(res => res.data),
+    delete: (id) => api.delete(`/trabajadores/${id}`).then(res => res.data),
+    cambiarPassword: (id, data) => api.patch(`/trabajadores/${id}/cambiar-password`, data).then(res => res.data),
+    login: (email, password) => api.post('/trabajadores/auth/login', { email, password }).then(res => res.data),
+};
+
 export const albaranesService = {
-    getAll: () => api.get('/albaranes').then(res => res.data),
+    getAll: (params) => {
+        const config = params ? { params } : {};
+        return api.get('/albaranes', config).then(res => res.data);
+    },
     getById: (id) => api.get(`/albaranes/${id}`).then(res => res.data),
     getByCliente: (clienteId) => api.get(`/albaranes/cliente/${clienteId}`).then(res => res.data),
     getByEstado: (estado) => api.get(`/albaranes/estado/${estado}`).then(res => res.data),

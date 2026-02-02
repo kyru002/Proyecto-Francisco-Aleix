@@ -47,4 +47,95 @@ router.delete("/:id", async (req, res) => {
     }
 });
 
+// ========== ENDPOINTS PARA CONTACTOS ==========
+
+// Obtener contactos de un cliente
+router.get("/:id/contactos", async (req, res) => {
+    try {
+        const cliente = await Cliente.findById(req.params.id);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+        res.json(cliente.contactos);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al obtener contactos", error: error.message });
+    }
+});
+
+// Crear un nuevo contacto en un cliente
+router.post("/:id/contactos", async (req, res) => {
+    try {
+        const cliente = await Cliente.findById(req.params.id);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+
+        const { nombre, email, telefono, puesto, esContactoPrincipal } = req.body;
+
+        if (!nombre || !email) {
+            return res.status(400).json({ msg: "Nombre y email son requeridos" });
+        }
+
+        const nuevoContacto = {
+            nombre,
+            email,
+            telefono: telefono || "",
+            puesto: puesto || "Contacto",
+            esContactoPrincipal: esContactoPrincipal || false
+        };
+
+        cliente.contactos.push(nuevoContacto);
+        const clienteActualizado = await cliente.save();
+        
+        res.status(201).json(clienteActualizado);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al crear contacto", error: error.message });
+    }
+});
+
+// Actualizar un contacto
+router.put("/:id/contactos/:contactoId", async (req, res) => {
+    try {
+        const cliente = await Cliente.findById(req.params.id);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+
+        const contacto = cliente.contactos.id(req.params.contactoId);
+        if (!contacto) {
+            return res.status(404).json({ msg: "Contacto no encontrado" });
+        }
+
+        const { nombre, email, telefono, puesto, esContactoPrincipal } = req.body;
+
+        if (nombre) contacto.nombre = nombre;
+        if (email) contacto.email = email;
+        if (telefono !== undefined) contacto.telefono = telefono;
+        if (puesto) contacto.puesto = puesto;
+        if (esContactoPrincipal !== undefined) contacto.esContactoPrincipal = esContactoPrincipal;
+
+        const clienteActualizado = await cliente.save();
+        res.json(clienteActualizado);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al actualizar contacto", error: error.message });
+    }
+});
+
+// Eliminar un contacto
+router.delete("/:id/contactos/:contactoId", async (req, res) => {
+    try {
+        const cliente = await Cliente.findById(req.params.id);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+
+        cliente.contactos.id(req.params.contactoId).deleteOne();
+        const clienteActualizado = await cliente.save();
+        
+        res.json(clienteActualizado);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al eliminar contacto", error: error.message });
+    }
+});
+
 module.exports = router;

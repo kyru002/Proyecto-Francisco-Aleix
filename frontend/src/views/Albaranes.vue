@@ -280,7 +280,7 @@ const getEstadoColor = (estado) => {
         <h1 class="page-title">Albaranes</h1>
         <p class="page-subtitle">Gestiona los albaranes de entrega</p>
       </div>
-      <button @click="showCreateModal = true" class="btn btn-primary">
+      <button v-if="store.currentUser?.role !== 'cliente'" @click="showCreateModal = true" class="btn btn-primary">
         <Plus />
         Nuevo Albarán
       </button>

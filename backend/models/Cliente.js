@@ -20,6 +20,11 @@ const ClienteSchema = new mongoose.Schema({
     telefono: {
         type: String,
         trim: true
+    },
+    usuarioAsociado: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Usuario',
+        default: null
     }
 }, {
     timestamps: true

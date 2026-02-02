@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ticketsService, tecnicosService, clientesService, albaranesService } from '../services/api';
+import { ticketsService, tecnicosService, clientesService, albaranesService, trabajadoresService } from '../services/api';
 
 export const useAppStore = defineStore('app', {
     state: () => ({
@@ -7,6 +7,7 @@ export const useAppStore = defineStore('app', {
         tecnicos: [],
         clientes: [],
         albaranes: [],
+        trabajadores: [],
         loading: false,
         currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
     }),
@@ -14,12 +15,31 @@ export const useAppStore = defineStore('app', {
         async fetchAll() {
             this.loading = true;
             try {
+                // Si es cliente, filtrar tickets y albaranes por su ID
+                let ticketsPromise;
+                let albaranesPromise;
+                let tecnicosPromise;
+                let clientesPromise;
+                
+                if (this.currentUser?.role === 'cliente' && this.currentUser?.clienteId) {
+                    ticketsPromise = ticketsService.getAll({ clienteId: this.currentUser.clienteId });
+                    albaranesPromise = albaranesService.getAll({ cliente: this.currentUser.clienteId });
+                    // Los clientes no necesitan ver la lista de técnicos ni otros clientes
+                    tecnicosPromise = Promise.resolve([]);
+                    clientesPromise = Promise.resolve([]);
+                } else {
+                    ticketsPromise = ticketsService.getAll();
+                    albaranesPromise = albaranesService.getAll();
+                    tecnicosPromise = tecnicosService.getAll();
+                    clientesPromise = clientesService.getAll();
+                }
+                
                 // Ejecutar en paralelo pero capturar errores individualmente para no bloquear todo
                 const results = await Promise.allSettled([
-                    ticketsService.getAll(),
-                    tecnicosService.getAll(),
-                    clientesService.getAll(),
-                    albaranesService.getAll(),
+                    ticketsPromise,
+                    tecnicosPromise,
+                    clientesPromise,
+                    albaranesPromise,
                 ]);
 
                 if (results[0].status === 'fulfilled') this.tickets = results[0].value;
@@ -66,6 +86,26 @@ export const useAppStore = defineStore('app', {
         async deleteCliente(id) {
             await clientesService.delete(id);
             this.clientes = this.clientes.filter(c => c._id !== id);
+        },
+        async createTrabajador(data) {
+            const nuevoTrabajador = await trabajadoresService.create(data);
+            this.trabajadores.unshift(nuevoTrabajador);
+            return nuevoTrabajador;
+        },
+        async updateTrabajador(id, data) {
+            const updatedTrabajador = await trabajadoresService.update(id, data);
+            const index = this.trabajadores.findIndex(t => t._id === id);
+            if (index !== -1) {
+                this.trabajadores[index] = updatedTrabajador;
+            }
+            return updatedTrabajador;
+        },
+        async deleteTrabajador(id) {
+            await trabajadoresService.delete(id);
+            this.trabajadores = this.trabajadores.filter(t => t._id !== id);
+        },
+        async cambiarPasswordTrabajador(id, data) {
+            return await trabajadoresService.cambiarPassword(id, data);
         },
         async updateTecnico(id, data) {
             const updatedTecnico = await tecnicosService.update(id, data);
