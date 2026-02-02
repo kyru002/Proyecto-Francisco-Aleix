@@ -1,7 +1,8 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
+import { io } from 'socket.io-client';
 import {
   ArrowLeft,
   MessageCircle,
@@ -11,7 +12,14 @@ import {
   User,
   Shield,
   CheckCircle,
-  FileText
+  FileText,
+  Video,
+  Phone,
+  X,
+  Mic,
+  MicOff,
+  VideoOff,
+  Monitor
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -24,6 +32,50 @@ const newMessage = ref('');
 const loading = ref(true);
 const error = ref('');
 
+// Variables para videollamada
+const socket = ref(null);
+const localStream = ref(null);
+const remoteStream = ref(null);
+const peerConnection = ref(null);
+const inCall = ref(false);
+const callInProgress = ref(false);
+const callType = ref(null); // 'voice' o 'video'
+const incomingCallData = ref(null);
+const showIncomingCall = ref(false);
+const isMuted = ref(false);
+const isVideoOff = ref(false);
+const remoteUserId = ref(null);
+const localVideoRef = ref(null);
+const remoteVideoRef = ref(null);
+const remoteAudioRef = ref(null);
+const remoteVideoPiPRef = ref(null);
+
+// Variables para screen sharing
+const screenStream = ref(null);
+const isSharingScreen = ref(false);
+const remoteScreenStream = ref(null);
+const isRemoteSharingScreen = ref(false);
+const localScreenVideoRef = ref(null);
+const remoteScreenVideoRef = ref(null);
+const remoteVideoRefs = ref([]); // Array para múltiples refs
+const originalVideoTrack = ref(null); // Guardar track original de cámara
+
+// Función para asignar refs de video remoto - DEPRECATED, usar ref directo
+const setRemoteVideoRef = (el) => {
+  if (el) {
+    remoteVideoRef.value = el;
+    console.log('🎥 Ref de video remoto asignado mediante función:', el);
+  }
+};
+
+// Configuración de WebRTC
+const peerConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
 onMounted(async () => {
   try {
     loading.value = true;
@@ -32,7 +84,6 @@ onMounted(async () => {
     // Obtener detalles del ticket
     const ticketData = await store.ticketsService?.getById?.(ticketId);
     if (!ticketData) {
-      // Si la API no está implementada, obtener del store
       const foundTicket = store.tickets.find(t => t._id === ticketId);
       if (foundTicket) {
         ticket.value = foundTicket;
@@ -43,19 +94,650 @@ onMounted(async () => {
     } else {
       ticket.value = ticketData;
       
-      // Obtener mensajes
       try {
         messages.value = await store.getTicketMessages(ticketId);
       } catch (err) {
         messages.value = ticketData.messages || [];
       }
     }
+
+    // Inicializar WebSocket
+    initializeSocket(ticketId);
   } catch (err) {
     error.value = 'Error al cargar el ticket: ' + err.message;
   } finally {
     loading.value = false;
   }
 });
+
+onUnmounted(() => {
+  if (inCall.value) {
+    endCall();
+  }
+  if (socket.value) {
+    socket.value.disconnect();
+  }
+});
+
+const initializeSocket = (ticketId) => {
+  console.log('🔌 Inicializando Socket.io...');
+  socket.value = io('http://localhost:5001', {
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5
+  });
+
+  socket.value.on('connect', () => {
+    console.log('✅ Socket conectado. ID:', socket.value.id);
+    console.log('🔗 Uniéndose a la sala del ticket...');
+    socket.value.emit('join-ticket-room', ticketId, {
+      name: store.currentUser?.name || 'Usuario',
+      role: store.currentUser?.role || 'cliente'
+    });
+    console.log('✅ join-ticket-room emitido');
+  });
+
+  // Recibir llamada entrante
+  socket.value.on('incoming-call', async (data) => {
+    console.log('☎️ EVENTO: incoming-call recibido');
+    console.log('   Datos:', data);
+    console.log('   Llamada entrante de:', data.callerName);
+    incomingCallData.value = data;
+    showIncomingCall.value = true;
+  });
+
+  // Respuesta a llamada
+  socket.value.on('call-answered', async (data) => {
+    console.log('Llamada aceptada');
+    remoteUserId.value = data.from;
+    await handleAnswerReceived(data.answer);
+  });
+
+  // Recibir ICE candidate
+  socket.value.on('ice-candidate', (data) => {
+    if (peerConnection.value && data.candidate) {
+      peerConnection.value.addIceCandidate(data.candidate).catch(err =>
+        console.error('Error al agregar ICE candidate:', err)
+      );
+    }
+  });
+
+  // Llamada rechazada
+  socket.value.on('call-rejected', () => {
+    console.log('Llamada rechazada');
+    inCall.value = false;
+    alert('La llamada fue rechazada');
+  });
+
+  // Llamada terminada
+  socket.value.on('call-ended', () => {
+    console.log('Llamada terminada por el otro usuario');
+    endCall();
+  });
+
+  // Pantalla compartida por otro usuario
+  socket.value.on('screen-share-started', () => {
+    console.log('La otra persona comenzó a compartir pantalla');
+    isRemoteSharingScreen.value = true;
+  });
+
+  // Pantalla dejó de ser compartida por otro usuario
+  socket.value.on('screen-share-stopped', () => {
+    console.log('La otra persona dejó de compartir pantalla');
+    isRemoteSharingScreen.value = false;
+    if (remoteScreenVideoRef.value) {
+      remoteScreenVideoRef.value.srcObject = null;
+    }
+  });
+
+  // Usuario desconectado
+  socket.value.on('user-disconnected', (data) => {
+    if (data.userId === remoteUserId.value) {
+      endCall();
+    }
+  });
+};
+
+const startCall = async (type) => {
+  try {
+    console.log(`📞 Iniciando ${type === 'voice' ? 'llamada de voz' : 'videollamada'}...`);
+    console.log('🔍 Socket status:', socket.value ? 'Conectado' : 'NO conectado');
+    
+    if (!socket.value || !socket.value.connected) {
+      alert('Socket no está conectado. Espera un momento e intenta de nuevo.');
+      return;
+    }
+    
+    // PASO 1: Guardar tipo de llamada y mostrar el contenedor
+    callType.value = type;
+    inCall.value = true;
+    callInProgress.value = true;
+    
+    // PASO 2: Esperar a que Vue renderice el elemento video
+    await nextTick();
+    console.log('✅ Vue renderizó el elemento video');
+    
+    // PASO 3: Solicitar stream según el tipo de llamada
+    console.log(`🎬 Solicitando acceso a ${type === 'voice' ? 'micrófono' : 'cámara y micrófono'}...`);
+    const constraints = type === 'voice' 
+      ? { audio: true, video: false }
+      : { video: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, audio: true };
+    
+    localStream.value = await navigator.mediaDevices.getUserMedia(constraints);
+
+    console.log('✅ Stream local obtenido:', localStream.value);
+    console.log('🎥 Tracks:', localStream.value.getTracks());
+
+    // PASO 4: Mostrar video local solo si es videollamada
+    if (type === 'video' && localVideoRef.value) {
+      console.log('📹 Asignando video a elemento ref...');
+      localVideoRef.value.srcObject = localStream.value;
+      localVideoRef.value.play().catch(e => console.error('Error al reproducir:', e));
+      console.log('✅ Video local asignado');
+    } else if (type === 'video') {
+      console.error('❌ localVideoRef no está disponible!');
+    }
+
+    // PASO 5: Crear conexión peer
+    peerConnection.value = new RTCPeerConnection({ iceServers: peerConfig.iceServers });
+
+    // Agregar tracks locales
+    localStream.value.getTracks().forEach(track => {
+      peerConnection.value.addTrack(track, localStream.value);
+    });
+
+    // Manejar streams remotos
+    peerConnection.value.ontrack = (event) => {
+      console.log('🎬 ONTRACK EVENT RECEIVED');
+      console.log('Track remoto recibido:', event.track.kind);
+      console.log('Track details:', { kind: event.track.kind, id: event.track.id, enabled: event.track.enabled });
+      console.log('Streams remotos:', event.streams);
+      console.log('callType.value:', callType.value);
+      
+      // Manejo de track de VIDEO remoto (screen share en llamadas de voz, o video en videollamadas)
+      if (event.track.kind === 'video') {
+        console.log('📹 Procesando track de VIDEO');
+        
+        if (callType.value === 'voice') {
+          // En llamada de voz, cualquier track de video es screen share
+          console.log('📺 Track de VIDEO en llamada de voz → Screen share remoto');
+          console.log('🔄 Estableciendo isRemoteSharingScreen = true');
+          isRemoteSharingScreen.value = true;
+          
+          // Crear un MediaStream con el track de pantalla
+          const screenStream = new MediaStream();
+          screenStream.addTrack(event.track);
+          console.log('✅ MediaStream creado con track de pantalla');
+          console.log('📺 Track details:', { kind: event.track.kind, enabled: event.track.enabled });
+          console.log('📺 Tracks en el stream:', screenStream.getTracks());
+          
+          // Usar nextTick para asegurar que Vue ha renderizado el elemento
+          nextTick(() => {
+            console.log('📺 nextTick ejecutado - buscando remoteScreenVideoRef');
+            console.log('remoteScreenVideoRef.value disponible:', !!remoteScreenVideoRef.value);
+            
+            if (remoteScreenVideoRef.value) {
+              console.log('📺 remoteScreenVideoRef ENCONTRADO, asignando srcObject...');
+              console.log('📺 Video element antes:', { tagName: remoteScreenVideoRef.value.tagName, id: remoteScreenVideoRef.value.id });
+              
+              remoteScreenVideoRef.value.srcObject = screenStream;
+              console.log('✅ srcObject asignado correctamente');
+              console.log('📺 srcObject ahora es:', remoteScreenVideoRef.value.srcObject);
+              console.log('📺 Tracks en srcObject:', remoteScreenVideoRef.value.srcObject?.getTracks());
+              
+              // Esperar un poco para que el navegador lo procese
+              setTimeout(() => {
+                console.log('⏱️ Intentando play()...');
+                if (remoteScreenVideoRef.value) {
+                  remoteScreenVideoRef.value.play()
+                    .then(() => console.log('✅ Play() ejecutado'))
+                    .catch(e => console.error('❌ Error en play():', e));
+                }
+              }, 100);
+            } else {
+              console.error('❌ remoteScreenVideoRef.value NO EXISTE en nextTick');
+            }
+          });
+        } else if (callType.value === 'video') {
+          // En videollamada, el track de video es de la cámara
+          console.log('🎥 Track de VIDEO en videollamada → Video remoto');
+          
+          if (event.streams && event.streams[0]) {
+            remoteStream.value = event.streams[0];
+            if (remoteVideoRef.value) {
+              remoteVideoRef.value.srcObject = remoteStream.value;
+              setTimeout(() => {
+                remoteVideoRef.value?.play().catch(e => console.error('Error:', e));
+              }, 100);
+              console.log('✅ Video remoto asignado');
+            }
+          }
+        }
+      }
+      
+      // Manejo de track de AUDIO remoto
+      if (event.track.kind === 'audio') {
+        console.log('🔊 Procesando track de AUDIO');
+        
+        if (callType.value === 'voice') {
+          // En llamada de voz, audio en remoteAudioRef
+          console.log('🔊 Audio en llamada de voz');
+          
+          if (event.streams && event.streams[0]) {
+            const audioStream = event.streams[0];
+            if (remoteAudioRef.value) {
+              remoteAudioRef.value.srcObject = audioStream;
+              setTimeout(() => {
+                remoteAudioRef.value?.play().catch(e => console.error('Error:', e));
+              }, 100);
+              console.log('✅ Audio remoto asignado');
+            }
+          }
+        } else if (callType.value === 'video') {
+          // En videollamada, el audio viene con el video (remoteVideoRef)
+          console.log('🎥 Audio en videollamada (con video)');
+        }
+      }
+    };
+
+    // Manejar ICE candidates
+    peerConnection.value.onicecandidate = (event) => {
+      if (event.candidate && socket.value) {
+        socket.value.emit('ice-candidate', {
+          ticketId: route.params.id,
+          candidate: event.candidate,
+          to: remoteUserId.value
+        });
+      }
+    };
+
+    // Crear oferta
+    const offer = await peerConnection.value.createOffer();
+    await peerConnection.value.setLocalDescription(offer);
+
+    // Enviar oferta
+    socket.value.emit('call-offer', {
+      ticketId: route.params.id,
+      offer: offer,
+      callerName: store.currentUser?.name || 'Usuario',
+      callType: type
+    });
+
+    console.log('📤 Oferta enviada');
+  } catch (err) {
+    console.error('Error en startCall:', err);
+    inCall.value = false;
+    callInProgress.value = false;
+    alert('Error al iniciar llamada: ' + err.message);
+  }
+};
+
+const acceptCall = async () => {
+  try {
+    console.log('📞 Aceptando llamada...');
+    
+    // PASO 1: Obtener tipo de llamada de los datos incientes
+    callType.value = incomingCallData.value.callType || 'video';
+    
+    // PASO 2: Mostrar el contenedor de video PRIMERO
+    remoteUserId.value = incomingCallData.value.from;
+    showIncomingCall.value = false;
+    inCall.value = true;
+    callInProgress.value = true;
+    
+    // PASO 3: Esperar a que Vue renderice el elemento video
+    await nextTick();
+    console.log('✅ Vue renderizó el elemento video');
+
+    // PASO 4: Obtener acceso según el tipo de llamada
+    console.log(`🎬 Solicitando acceso a ${callType.value === 'voice' ? 'micrófono' : 'cámara y micrófono'}...`);
+    const constraints = callType.value === 'voice' 
+      ? { audio: true, video: false }
+      : { video: { width: { min: 640, ideal: 1280, max: 1920 }, height: { min: 480, ideal: 720, max: 1080 } }, audio: true };
+    
+    localStream.value = await navigator.mediaDevices.getUserMedia(constraints);
+
+    console.log('✅ Stream local obtenido:', localStream.value);
+
+    // PASO 5: Mostrar video local solo si es videollamada
+    if (callType.value === 'video' && localVideoRef.value) {
+      console.log('📹 Asignando video a elemento ref...');
+      localVideoRef.value.srcObject = localStream.value;
+      localVideoRef.value.play().catch(e => console.error('Error al reproducir:', e));
+      console.log('✅ Video local asignado');
+    }
+
+    // PASO 6: Crear conexión peer
+    peerConnection.value = new RTCPeerConnection({ iceServers: peerConfig.iceServers });
+
+    localStream.value.getTracks().forEach(track => {
+      peerConnection.value.addTrack(track, localStream.value);
+    });
+
+    peerConnection.value.ontrack = (event) => {
+      console.log('Track remoto recibido en acceptCall:', event.track.kind);
+      console.log('Track details:', { kind: event.track.kind, id: event.track.id, enabled: event.track.enabled });
+      console.log('Streams remotos:', event.streams);
+      
+      // Manejo de track de VIDEO remoto (screen share en llamadas de voz, o video en videollamadas)
+      if (event.track.kind === 'video') {
+        console.log('📹 Procesando track de VIDEO');
+        
+        if (callType.value === 'voice') {
+          // En llamada de voz, cualquier track de video es screen share
+          console.log('📺 Track de VIDEO en llamada de voz → Screen share remoto (acceptCall)');
+          console.log('🔄 Estableciendo isRemoteSharingScreen = true');
+          isRemoteSharingScreen.value = true;
+          
+          // Crear un MediaStream con el track de pantalla
+          const screenStream = new MediaStream();
+          screenStream.addTrack(event.track);
+          console.log('✅ MediaStream creado con track de pantalla (acceptCall)');
+          console.log('📺 Track details:', { kind: event.track.kind, enabled: event.track.enabled });
+          console.log('📺 Tracks en el stream:', screenStream.getTracks());
+          
+          // Usar nextTick para asegurar que Vue ha renderizado el elemento
+          nextTick(() => {
+            console.log('📺 nextTick ejecutado (acceptCall) - buscando remoteScreenVideoRef');
+            console.log('remoteScreenVideoRef.value disponible:', !!remoteScreenVideoRef.value);
+            
+            if (remoteScreenVideoRef.value) {
+              console.log('📺 remoteScreenVideoRef ENCONTRADO, asignando srcObject...');
+              console.log('📺 Video element antes:', { tagName: remoteScreenVideoRef.value.tagName, id: remoteScreenVideoRef.value.id });
+              
+              remoteScreenVideoRef.value.srcObject = screenStream;
+              console.log('✅ srcObject asignado correctamente (acceptCall)');
+              console.log('📺 srcObject ahora es:', remoteScreenVideoRef.value.srcObject);
+              console.log('📺 Tracks en srcObject:', remoteScreenVideoRef.value.srcObject?.getTracks());
+              
+              // Esperar un poco para que el navegador lo procese
+              setTimeout(() => {
+                console.log('⏱️ Intentando play() (acceptCall)...');
+                if (remoteScreenVideoRef.value) {
+                  remoteScreenVideoRef.value.play()
+                    .then(() => console.log('✅ Play() ejecutado (acceptCall)'))
+                    .catch(e => console.error('❌ Error en play() (acceptCall):', e));
+                }
+              }, 100);
+            } else {
+              console.error('❌ remoteScreenVideoRef.value NO EXISTE en nextTick (acceptCall)');
+            }
+          });
+        } else if (callType.value === 'video') {
+          // En videollamada, el track de video es de la cámara
+          console.log('🎥 Track de VIDEO en videollamada → Video remoto');
+          
+          if (event.streams && event.streams[0]) {
+            remoteStream.value = event.streams[0];
+            if (remoteVideoRef.value) {
+              remoteVideoRef.value.srcObject = remoteStream.value;
+              setTimeout(() => {
+                remoteVideoRef.value?.play().catch(e => console.error('Error:', e));
+              }, 100);
+              console.log('✅ Video remoto asignado');
+            }
+          }
+        }
+      }
+      
+      // Manejo de track de AUDIO remoto
+      if (event.track.kind === 'audio') {
+        console.log('🔊 Procesando track de AUDIO');
+        
+        if (callType.value === 'voice') {
+          // En llamada de voz, audio en remoteAudioRef
+          console.log('🔊 Audio en llamada de voz');
+          
+          if (event.streams && event.streams[0]) {
+            const audioStream = event.streams[0];
+            if (remoteAudioRef.value) {
+              remoteAudioRef.value.srcObject = audioStream;
+              setTimeout(() => {
+                remoteAudioRef.value?.play().catch(e => console.error('Error:', e));
+              }, 100);
+              console.log('✅ Audio remoto asignado');
+            }
+          }
+        } else if (callType.value === 'video') {
+          // En videollamada, el audio viene con el video (remoteVideoRef)
+          console.log('🎥 Audio en videollamada (con video)');
+        }
+      }
+    };
+
+    peerConnection.value.onicecandidate = (event) => {
+      if (event.candidate && socket.value) {
+        socket.value.emit('ice-candidate', {
+          ticketId: route.params.id,
+          candidate: event.candidate,
+          to: remoteUserId.value
+        });
+      }
+    };
+
+    // Establecer oferta remota y crear respuesta
+    await peerConnection.value.setRemoteDescription(new RTCSessionDescription(incomingCallData.value.offer));
+    const answer = await peerConnection.value.createAnswer();
+    await peerConnection.value.setLocalDescription(answer);
+
+    // Enviar respuesta
+    socket.value.emit('call-answer', {
+      ticketId: route.params.id,
+      answer: answer,
+      to: remoteUserId.value
+    });
+
+    console.log('📤 Respuesta enviada');
+  } catch (err) {
+    console.error('Error en acceptCall:', err);
+    inCall.value = false;
+    callInProgress.value = false;
+    alert('Error al aceptar llamada: ' + err.message);
+  }
+};
+
+const handleAnswerReceived = async (answer) => {
+  try {
+    await peerConnection.value.setRemoteDescription(new RTCSessionDescription(answer));
+  } catch (err) {
+    console.error('Error al procesar respuesta:', err);
+  }
+};
+
+const rejectCall = () => {
+  socket.value.emit('reject-call', {
+    to: incomingCallData.value.from
+  });
+  showIncomingCall.value = false;
+  incomingCallData.value = null;
+};
+
+const toggleMute = () => {
+  if (localStream.value) {
+    localStream.value.getAudioTracks().forEach(track => {
+      track.enabled = !track.enabled;
+    });
+    isMuted.value = !isMuted.value;
+  }
+};
+
+const toggleVideo = () => {
+  if (localStream.value) {
+    localStream.value.getVideoTracks().forEach(track => {
+      track.enabled = !track.enabled;
+    });
+    isVideoOff.value = !isVideoOff.value;
+  }
+};
+
+const startScreenShare = async () => {
+  try {
+    console.log('🖥️ Solicitando pantalla...');
+    
+    // PASO 1: Mostrar el contenedor PRIMERO para que Vue renderice el elemento video
+    isSharingScreen.value = true;
+    await nextTick();
+    console.log('📺 Elemento video renderizado');
+    
+    // PASO 2: Ahora obtener la pantalla
+    screenStream.value = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        cursor: 'always'
+      },
+      audio: false
+    });
+
+    console.log('✅ Pantalla compartida obtenida');
+    console.log('📺 Ref disponible:', !!localScreenVideoRef.value);
+
+    // PASO 3: Asignar el stream de pantalla al video element local
+    if (localScreenVideoRef.value) {
+      localScreenVideoRef.value.srcObject = screenStream.value;
+      // Esperar un poco para asegurar que el navegador lo procese
+      setTimeout(() => {
+        if (localScreenVideoRef.value && localScreenVideoRef.value.play) {
+          localScreenVideoRef.value.play().catch(e => console.error('Error al reproducir:', e));
+        }
+      }, 0);
+      console.log('✅ Video de pantalla asignado');
+    } else {
+      console.error('❌ localScreenVideoRef.value es NULL');
+    }
+
+    // Obtener el track de video de la pantalla
+    const screenTrack = screenStream.value.getVideoTracks()[0];
+
+    // OPCIÓN 1: Agregar el track de pantalla como track adicional (MEJOR - mantiene la cámara visible)
+    // Esto permite que ambos tracks (cámara + pantalla) se envíen simultáneamente
+    if (peerConnection.value) {
+      // Guardar el track original por si queremos restaurarlo después
+      originalVideoTrack.value = screenTrack;
+      
+      // Agregar el track de pantalla como un track adicional
+      // IMPORTANTE: usar localStream.value, NO screenStream.value
+      // El receptor verá tanto el track original como este nuevo
+      peerConnection.value.addTrack(screenTrack, localStream.value);
+      console.log('✅ Track de pantalla agregado (además del de cámara)');
+      console.log('📺 screenTrack:', { kind: screenTrack.kind, enabled: screenTrack.enabled });
+      console.log('📺 Associated with localStream:', localStream.value.id);
+
+      // RENEGOTIATION: Crear nueva oferta para que el receiver reciba el nuevo track
+      console.log('🔄 Iniciando renegotiation...');
+      const newOffer = await peerConnection.value.createOffer();
+      await peerConnection.value.setLocalDescription(newOffer);
+      
+      // Enviar nueva oferta
+      if (socket.value && remoteUserId.value) {
+        console.log('📤 Enviando nueva oferta para screen share...');
+        socket.value.emit('call-offer', {
+          ticketId: route.params.id,
+          offer: newOffer,
+          callerName: store.currentUser?.name || 'Usuario',
+          callType: callType.value
+        });
+      }
+
+      // Notificar a la otra persona que estamos compartiendo pantalla
+      if (socket.value) {
+        socket.value.emit('screen-share-started', {
+          ticketId: route.params.id,
+          from: store.currentUser.id
+        });
+      }
+
+      // Si el usuario detiene la pantalla desde el selector del SO
+      screenTrack.onended = () => {
+        console.log('❌ Pantalla finalizada por el usuario');
+        stopScreenShare();
+      };
+    }
+  } catch (err) {
+    console.error('Error al compartir pantalla:', err);
+    if (err.name !== 'NotAllowedError') {
+      alert('Error al compartir pantalla: ' + err.message);
+    }
+  }
+};
+
+const stopScreenShare = async () => {
+  try {
+    console.log('🖥️ Deteniendo compartición de pantalla...');
+
+    // Limpiar el video de pantalla local
+    if (localScreenVideoRef.value) {
+      localScreenVideoRef.value.srcObject = null;
+    }
+
+    // Detener todos los tracks de la pantalla
+    if (screenStream.value) {
+      screenStream.value.getTracks().forEach(track => track.stop());
+      
+      // Remover el sender del track de pantalla de la conexión peer
+      if (peerConnection.value) {
+        const screenSender = peerConnection.value
+          .getSenders()
+          .find(s => s.track && s.track.kind === 'video' && screenStream.value && screenStream.value.getTracks().includes(s.track));
+        
+        if (screenSender) {
+          await peerConnection.value.removeTrack(screenSender);
+          console.log('✅ Track de pantalla removido de la conexión peer');
+        }
+      }
+      
+      screenStream.value = null;
+    }
+
+    isSharingScreen.value = false;
+    originalVideoTrack.value = null;
+
+    // Notificar a la otra persona que dejamos de compartir
+    if (socket.value && store.currentUser) {
+      socket.value.emit('screen-share-stopped', {
+        ticketId: route.params.id,
+        from: store.currentUser.id
+      });
+    }
+  } catch (err) {
+    console.error('Error al detener screen share:', err);
+  }
+};
+
+const endCall = () => {
+  if (remoteUserId.value && socket.value) {
+    socket.value.emit('end-call', {
+      ticketId: route.params.id,
+      to: remoteUserId.value
+    });
+  }
+
+  // Detener screen share si está activo
+  if (isSharingScreen.value && screenStream.value) {
+    screenStream.value.getTracks().forEach(track => track.stop());
+    screenStream.value = null;
+    isSharingScreen.value = false;
+  }
+
+  // Cerrar streams
+  if (localStream.value) {
+    localStream.value.getTracks().forEach(track => track.stop());
+  }
+
+  // Cerrar conexión peer
+  if (peerConnection.value) {
+    peerConnection.value.close();
+  }
+
+  inCall.value = false;
+  callInProgress.value = false;
+  callType.value = null;
+  isSharingScreen.value = false;
+  localStream.value = null;
+  remoteStream.value = null;
+  peerConnection.value = null;
+  remoteUserId.value = null;
+  isMuted.value = false;
+  isVideoOff.value = false;
+};
 
 const handleSendMessage = async () => {
   if (!newMessage.value.trim()) {
@@ -205,18 +887,32 @@ const formatDate = (date) => {
     </div>
 
     <!-- Ticket Details -->
-    <div v-else-if="ticket" class="container-layout">
-      <!-- Panel Izquierdo - Detalles -->
-      <div class="card" style="flex: 1; min-width: 0;">
-        <div class="card-header">
-          <h2 class="card-title">Detalles del Ticket</h2>
-        </div>
-        <div class="card-content">
+    <div v-else-if="ticket" style="display: flex; flex-direction: column; gap: 1.5rem; height: 100vh; overflow: hidden;">
+      <!-- Detalles del Ticket - Collapsible -->
+      <details class="ticket-details-collapsible" style="border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; flex-shrink: 0;">
+        <summary style="
+          padding: 1rem 1.5rem;
+          background-color: var(--muted);
+          cursor: pointer;
+          font-weight: 600;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          user-select: none;
+        ">
+          <span style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.125rem;">📋</span>
+            Detalles del Ticket
+          </span>
+          <span style="font-size: 0.75rem; color: var(--muted-foreground);">#{{ ticket._id?.slice(-6).toUpperCase() }}</span>
+        </summary>
+        
+        <div class="card-content" style="border-top: 1px solid var(--border);">
           <!-- Estado y Prioridad -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
             <div>
-              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.5rem;">Estado</div>
-              <div v-if="ticket.status !== 'cerrado'" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.5rem; font-weight: 500;">Estado</div>
+              <div v-if="ticket.status !== 'cerrado'" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
                 <span :class="['badge', getStatusColor(ticket.status)]">{{ ticket.status }}</span>
                 <select 
                   :value="ticket.status" 
@@ -227,7 +923,7 @@ const formatDate = (date) => {
                       handleChangeStatus(e.target.value);
                     }
                   }"
-                  style="padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.875rem;"
+                  style="padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.875rem;"
                 >
                   <option value="abierto">Abierto</option>
                   <option value="en progreso">En Progreso</option>
@@ -236,66 +932,257 @@ const formatDate = (date) => {
               </div>
               <div v-else style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <span :class="['badge', getStatusColor(ticket.status)]">{{ ticket.status }}</span>
-                <button @click="handleReopenTicket" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
-                  <CheckCircle style="width: 16px; height: 16px;" />
-                  Reabrir Ticket
-                </button>
-                <button @click="handleCloseTicketAndCreateAlbaran" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
-                  <FileText style="width: 16px; height: 16px;" />
-                  Crear Albarán
-                </button>
+                <button @click="handleReopenTicket" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.75rem;">Reabrir</button>
+                <button @click="handleCloseTicketAndCreateAlbaran" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.75rem;">Crear Albarán</button>
               </div>
             </div>
             <div>
-              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.5rem;">Prioridad</div>
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.5rem; font-weight: 500;">Prioridad</div>
               <span :class="['badge', getPriorityColor(ticket.priority)]">{{ ticket.priority }}</span>
             </div>
           </div>
 
           <!-- Información del Ticket -->
-          <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;">
-            <div style="display: grid; gap: 1rem;">
-              <div>
-                <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Cliente</div>
-                <p style="margin: 0; font-weight: 500;">{{ ticket.cliente?.nombreEmpresa || 'Sin asignar' }}</p>
-              </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div>
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">Cliente</div>
+              <p style="margin: 0; font-weight: 500;">{{ ticket.cliente?.nombreEmpresa || 'Sin asignar' }}</p>
+            </div>
 
-              <div>
-                <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Técnico Asignado</div>
-                <p style="margin: 0; font-weight: 500;">{{ ticket.tecnico?.nombre || 'Sin asignar' }}</p>
-              </div>
+            <div>
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">Técnico Asignado</div>
+              <p style="margin: 0; font-weight: 500;">{{ ticket.tecnico?.nombre || 'Sin asignar' }}</p>
+            </div>
 
-              <div>
-                <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Descripción</div>
-                <p style="margin: 0; line-height: 1.5;">{{ ticket.description }}</p>
-              </div>
+            <div style="grid-column: 1 / -1;">
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">Descripción</div>
+              <p style="margin: 0; line-height: 1.5; color: var(--muted-foreground);">{{ ticket.description }}</p>
+            </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div>
-                  <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Fecha de Apertura</div>
-                  <p style="margin: 0; font-size: 0.875rem;">{{ formatDate(ticket.startDate) }}</p>
-                </div>
-                <div v-if="ticket.endDate">
-                  <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem;">Fecha de Cierre</div>
-                  <p style="margin: 0; font-size: 0.875rem;">{{ formatDate(ticket.endDate) }}</p>
-                </div>
-              </div>
+            <div>
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">Fecha de Apertura</div>
+              <p style="margin: 0; font-size: 0.875rem;">{{ formatDate(ticket.startDate) }}</p>
+            </div>
+            <div v-if="ticket.endDate">
+              <div style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">Fecha de Cierre</div>
+              <p style="margin: 0; font-size: 0.875rem;">{{ formatDate(ticket.endDate) }}</p>
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
-      <!-- Panel Derecho - Mensajes -->
-      <div class="card" style="flex: 1.2; min-width: 0; display: flex; flex-direction: column;">
+      <!-- Panel Principal - Chat y Llamadas -->
+      <div class="card" style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;">
         <div class="card-header">
           <h2 class="card-title">
             <MessageCircle style="width: 20px; height: 20px; display: inline; margin-right: 0.5rem;" />
             Conversación
           </h2>
+          <!-- Botones de Llamada en Header -->
+          <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+            <button 
+              v-if="!callInProgress && !inCall" 
+              @click="startCall('voice')" 
+              class="btn btn-primary"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;"
+            >
+              <Phone style="width: 18px; height: 18px;" />
+              Llamada de voz
+            </button>
+            <button 
+              v-if="!callInProgress && !inCall" 
+              @click="startCall('video')" 
+              class="btn btn-primary"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;"
+            >
+              <Video style="width: 18px; height: 18px;" />
+              Videollamada
+            </button>
+            <span v-if="inCall" style="color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+              <div style="width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; animation: pulse 2s infinite;"></div>
+              {{ callType === 'voice' ? 'Llamada de voz' : 'Videollamada' }} en curso
+            </span>
+          </div>
+        </div>
+
+        <!-- Área de Llamada -->
+        <div v-if="inCall" class="video-container" style="display: flex; flex-direction: column; gap: 1rem; padding: 1rem; background-color: var(--muted); border-radius: 8px; max-height: 580px; overflow: hidden;">
+          
+          <!-- Indicador de compartición de pantalla (solo en llamada de voz) -->
+          <div v-if="callType === 'voice' && isSharingScreen" style="background-color: #3b82f6; color: white; padding: 0.75rem 1rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
+            <Monitor style="width: 16px; height: 16px;" />
+            Estás compartiendo tu pantalla
+          </div>
+
+          <!-- Layout para Videollamada -->
+          <div v-if="callType === 'video'" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; height: 480px;">
+            <!-- Video Local -->
+            <div style="position: relative; background-color: #000; border-radius: 6px; overflow: hidden;">
+              <video 
+                ref="localVideoRef" 
+                autoplay 
+                playsinline 
+                muted
+                style="width: 100%; height: 100%; object-fit: cover; display: block;"
+              ></video>
+              <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.75rem; color: white; background-color: rgba(0,0,0,0.5); padding: 0.25rem 0.5rem; border-radius: 3px;">
+                Tú
+              </div>
+            </div>
+            
+            <!-- Video Remoto -->
+            <div style="position: relative; background-color: #000; border-radius: 6px; overflow: hidden;">
+              <video 
+                ref="remoteVideoRef"
+                autoplay
+                playsinline
+                style="width: 100%; height: 100%; object-fit: cover; display: block;"
+              ></video>
+              <div v-if="!remoteStream" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #999; text-align: center;">
+                <div style="font-size: 0.875rem;">Esperando conexión...</div>
+              </div>
+              <div v-else style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.75rem; color: white; background-color: rgba(0,0,0,0.5); padding: 0.25rem 0.5rem; border-radius: 3px;">
+                Otra persona
+              </div>
+            </div>
+          </div>
+
+          <!-- Layout para Llamada de Voz (con opción de compartir pantalla) -->
+          <div v-else-if="callType === 'voice'" style="height: 480px; overflow: hidden; display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Elemento de audio remoto (oculto pero activo) -->
+            <audio 
+              ref="remoteAudioRef" 
+              autoplay
+              style="display: none;"
+            ></audio>
+            
+            <!-- Pantalla remota si la otra persona la comparte -->
+            <div v-show="isRemoteSharingScreen" style="position: relative; background-color: #000; border-radius: 6px; overflow: hidden; flex: 1;">
+              <video 
+                ref="remoteScreenVideoRef" 
+                autoplay 
+                playsinline
+                style="width: 100%; height: 100%; object-fit: contain; display: block; background-color: #000;"
+              ></video>
+              <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.75rem; color: white; background-color: rgba(0,0,0,0.5); padding: 0.25rem 0.5rem; border-radius: 3px;">
+                Pantalla compartida
+              </div>
+            </div>
+            
+            <!-- Pantalla local si se está compartiendo -->
+            <div v-show="isSharingScreen && !isRemoteSharingScreen" style="position: relative; background-color: #000; border-radius: 6px; overflow: hidden; flex: 1;">
+              <video 
+                ref="localScreenVideoRef" 
+                autoplay 
+                playsinline
+                muted
+                style="width: 100%; height: 100%; object-fit: contain; display: block; background-color: #000;"
+              ></video>
+              <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.75rem; color: white; background-color: rgba(0,0,0,0.5); padding: 0.25rem 0.5rem; border-radius: 3px;">
+                Tu pantalla compartida
+              </div>
+            </div>
+            
+            <!-- Ícono de llamada de voz cuando no hay screen sharing -->
+            <div v-show="!isSharingScreen && !isRemoteSharingScreen" style="background-color: #000; border-radius: 6px; padding: 2rem; text-align: center; flex: 1; display: flex; align-items: center; justify-content: center;">
+              <div style="color: white; text-align: center;">
+                <Phone style="width: 36px; height: 36px; margin-bottom: 0.5rem; animation: pulse 2s infinite;" />
+                <p style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem;">Llamada de voz en curso</p>
+                <p style="color: #999; margin: 0; font-size: 0.8rem;">Presiona "Compartir pantalla" para comenzar</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controles de Llamada -->
+          <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+            <!-- Controles de Micrófono y Video (solo en videollamada) -->
+            <button 
+              v-if="callType === 'video'"
+              @click="toggleMute" 
+              :class="['btn', isMuted ? 'btn-secondary' : 'btn-default']"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+            >
+              <MicOff v-if="isMuted" style="width: 18px; height: 18px;" />
+              <Mic v-else style="width: 18px; height: 18px;" />
+              {{ isMuted ? 'Mute' : 'Micrófono' }}
+            </button>
+
+            <button 
+              v-if="callType === 'video'"
+              @click="toggleVideo" 
+              :class="['btn', isVideoOff ? 'btn-secondary' : 'btn-default']"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+            >
+              <VideoOff v-if="isVideoOff" style="width: 18px; height: 18px;" />
+              <Video v-else style="width: 18px; height: 18px;" />
+              {{ isVideoOff ? 'Video off' : 'Cámara' }}
+            </button>
+
+            <!-- Botón de Micrófono en Llamada de Voz -->
+            <button 
+              v-if="callType === 'voice'"
+              @click="toggleMute" 
+              :class="['btn', isMuted ? 'btn-secondary' : 'btn-default']"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+            >
+              <MicOff v-if="isMuted" style="width: 18px; height: 18px;" />
+              <Mic v-else style="width: 18px; height: 18px;" />
+              {{ isMuted ? 'Mute' : 'Micrófono' }}
+            </button>
+
+            <!-- Botón de Compartir Pantalla (solo en llamada de voz) -->
+            <button 
+              v-if="callType === 'voice'"
+              @click="isSharingScreen ? stopScreenShare() : startScreenShare()" 
+              :class="['btn', isSharingScreen ? 'btn-primary' : 'btn-default']"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+            >
+              <Monitor style="width: 18px; height: 18px;" />
+              {{ isSharingScreen ? 'Parar' : 'Pantalla' }}
+            </button>
+
+            <!-- Botón de Finalizar Llamada -->
+            <button 
+              @click="endCall" 
+              class="btn btn-danger"
+              style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.85rem;"
+            >
+              <Phone style="width: 18px; height: 18px;" />
+              Colgar
+            </button>
+          </div>
+        </div>
+
+        <!-- Modal de Llamada Entrante -->
+        <div v-if="showIncomingCall" class="incoming-call-modal">
+          <div style="background-color: white; border-radius: 8px; padding: 2rem; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 400px;">
+            <Phone style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 1rem; animation: ring 1s infinite;" />
+            <h3 style="margin-top: 0; margin-bottom: 0.5rem;">{{ incomingCallData?.callType === 'voice' ? 'Llamada de voz entrante' : 'Videollamada entrante' }}</h3>
+            <p style="color: var(--muted-foreground); margin-bottom: 2rem;">{{ incomingCallData?.from || 'Otra persona' }} quiere comunicarse contigo</p>
+            
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <button 
+                @click="acceptCall" 
+                class="btn btn-primary"
+                style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background-color: #10b981; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;"
+              >
+                <Phone style="width: 20px; height: 20px;" />
+                Aceptar
+              </button>
+              <button 
+                @click="rejectCall" 
+                class="btn btn-secondary"
+                style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background-color: #ef4444; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;"
+              >
+                <X style="width: 20px; height: 20px;" />
+                Rechazar
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Área de Mensajes -->
-        <div class="card-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; max-height: 400px;">
+        <div class="card-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
           <div v-if="messages.length === 0" style="text-align: center; color: var(--muted-foreground); padding: 2rem 1rem;">
             <MessageCircle style="width: 40px; height: 40px; opacity: 0.2; margin-bottom: 1rem;" />
             <p>No hay mensajes aún. Sé el primero en escribir.</p>
@@ -358,11 +1245,35 @@ const formatDate = (date) => {
 </template>
 
 <style scoped>
-.container-layout {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+.ticket-details-collapsible {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.ticket-details-collapsible summary {
+  padding: 1rem 1.5rem;
+  background-color: var(--muted);
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.ticket-details-collapsible summary:hover {
+  background-color: var(--border);
+}
+
+.ticket-details-collapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+.ticket-details-collapsible[open] summary {
+  background-color: var(--primary-light);
+  border-bottom: 2px solid var(--primary);
 }
 
 .message-item {
@@ -370,6 +1281,49 @@ const formatDate = (date) => {
   background-color: var(--background);
   border-radius: 6px;
   animation: slideIn 0.3s ease-out;
+}
+
+.video-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--muted);
+  border-radius: 8px;
+}
+
+.incoming-call-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.btn-default {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.btn-default:hover {
+  background-color: var(--border);
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
 }
 
 @keyframes slideIn {
@@ -383,9 +1337,61 @@ const formatDate = (date) => {
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes ring {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10%, 20% {
+    transform: rotate(-25deg);
+  }
+  30%, 50%, 70%, 90% {
+    transform: rotate(25deg);
+  }
+  40%, 60%, 80% {
+    transform: rotate(-25deg);
+  }
+}
+
 @media (max-width: 1024px) {
   .container-layout {
     grid-template-columns: 1fr;
+  }
+
+  .video-container {
+    height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .container-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .video-container > div {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
   }
 }
 </style>

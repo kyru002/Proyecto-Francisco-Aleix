@@ -12,17 +12,25 @@ const password = ref('');
 const error = ref('');
 
 const handleLogin = () => {
-  // Simulación de login (el backend real solo tiene técnicos/clientes pero no auth completa aún)
-  if (email.value === 'admin@support.com' && password.value === 'admin123') {
+  // Simulación de login - múltiples cuentas de prueba
+  const users = {
+    'admin@support.com': { id: "1", name: "Admin Usuario", role: "admin", password: "admin123" },
+    'tecnico@support.com': { id: "2", name: "Juan García (Técnico)", role: "tecnico", password: "tecnico123" },
+    'cliente@support.com': { id: "3", name: "María López (Cliente)", role: "cliente", password: "cliente123" }
+  };
+
+  const user = users[email.value];
+  
+  if (user && password.value === user.password) {
     store.login({
-      id: "1",
-      name: "Admin Usuario",
-      email: "admin@support.com",
-      role: "admin"
+      id: user.id,
+      name: user.name,
+      email: email.value,
+      role: user.role
     });
     router.push('/dashboard');
   } else {
-    error.value = 'Credenciales no válidas. Prueba con admin@support.com / admin123';
+    error.value = 'Credenciales no válidas. Consulta la sección de cuentas de demostración.';
   }
 };
 </script>
@@ -67,10 +75,23 @@ const handleLogin = () => {
         </form>
 
         <div class="login-demo">
-          <div class="login-demo-title">CUENTA DE DEMOSTRACIÓN</div>
+          <div class="login-demo-title">CUENTAS DE DEMOSTRACIÓN</div>
           <div class="login-demo-credentials">
-            Email: <strong>admin@support.com</strong><br>
-            Pass: <strong>admin123</strong>
+            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+              <strong style="color: #6366f1;">Administrador:</strong><br>
+              Email: <strong>admin@support.com</strong><br>
+              Pass: <strong>admin123</strong>
+            </div>
+            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+              <strong style="color: #f59e0b;">Técnico:</strong><br>
+              Email: <strong>tecnico@support.com</strong><br>
+              Pass: <strong>tecnico123</strong>
+            </div>
+            <div>
+              <strong style="color: #10b981;">Cliente:</strong><br>
+              Email: <strong>cliente@support.com</strong><br>
+              Pass: <strong>cliente123</strong>
+            </div>
           </div>
         </div>
       </div>
