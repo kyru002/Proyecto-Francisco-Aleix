@@ -16,8 +16,11 @@ const showCreateModal = ref(false);
 const newTecnico = ref({
   nombre: '',
   email: '',
-  role: 'technician',
-  estado: 'activo'
+  role: 'trabajador',
+  puesto: 'Técnico de Soporte',
+  empresa: '', 
+  estado: 'activo',
+  telefono: ''
 });
 
 onMounted(async () => {
@@ -30,12 +33,26 @@ const showMenuId = ref(null);
 
 const handleCreateTecnico = async () => {
   try {
-    await store.createTecnico(newTecnico.value);
+    // Si el administrador tiene una empresa asociada, usarla por defecto
+    if (!newTecnico.value.empresa && store.currentUser?.clienteId) {
+      newTecnico.value.empresa = store.currentUser.clienteId;
+    }
+    
+    await store.createTrabajador({ ...newTecnico.value, empresa: newTecnico.value.empresa || undefined });
     showCreateModal.value = false;
-    newTecnico.value = { nombre: '', email: '', role: 'technician', estado: 'activo' };
+    newTecnico.value = { 
+        nombre: '', 
+        email: '', 
+        role: 'trabajador', 
+        puesto: 'Técnico de Soporte', 
+        empresa: '', 
+        estado: 'activo',
+        telefono: ''
+    };
+    alert('Miembro del equipo creado con éxito. Se le ha asignado una contraseña temporal.');
   } catch (error) {
-    console.error('Error al crear técnico:', error);
-    alert(`Error al crear el técnico: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
+    console.error('Error al crear trabajador:', error);
+    alert(`Error al crear el miembro: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
   }
 };
 
@@ -47,21 +64,21 @@ const handleEditTecnico = (tecnico) => {
 
 const handleSaveEdit = async () => {
   try {
-    await store.updateTecnico(editingTecnico.value._id, editingTecnico.value);
+    await store.updateTrabajador(editingTecnico.value._id, editingTecnico.value);
     showEditModal.value = false;
     editingTecnico.value = null;
   } catch (error) {
-    alert('Error al actualizar el técnico');
+    alert('Error al actualizar el miembro del equipo');
   }
 };
 
 const handleDeleteTecnico = async (tecnicoId) => {
-  if (confirm('¿Estás seguro de que quieres eliminar este técnico?')) {
+  if (confirm('¿Estás seguro de que quieres eliminar este miembro del equipo?')) {
     try {
-      await store.deleteTecnico(tecnicoId);
+      await store.deleteTrabajador(tecnicoId);
       showMenuId.value = null;
     } catch (error) {
-      alert('Error al eliminar el técnico');
+      alert('Error al eliminar el miembro');
     }
   }
 };
@@ -111,7 +128,7 @@ const toggleMenu = (tecnicoId) => {
               <td>
                 <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem;">
                   <Shield style="width: 14px; height: 14px; color: var(--primary);" />
-                  {{ tecnico.role === 'admin' ? 'Administrador' : 'Técnico' }}
+                  {{ tecnico.role === 'admin' ? 'Administrador' : 'Empleado' }}
                 </div>
               </td>
               <td>
@@ -199,8 +216,19 @@ const toggleMenu = (tecnicoId) => {
             <div class="form-group">
               <label class="form-label">Rol del Usuario</label>
               <select v-model="newTecnico.role" class="form-input form-select" required>
-                <option value="technician">Técnico</option>
+                <option value="trabajador">Trabajador (Técnico)</option>
                 <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Puesto / Cargo</label>
+              <input v-model="newTecnico.puesto" type="text" class="form-input" required placeholder="Ej: Técnico de Nivel 1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Empresa Responsable (Opcional)</label>
+              <select v-model="newTecnico.empresa" class="form-input form-select">
+                <option value="">Ninguna / Interno</option>
+                <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa }}</option>
               </select>
             </div>
           </div>

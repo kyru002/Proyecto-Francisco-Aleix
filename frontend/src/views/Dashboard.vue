@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
 import { 
   Ticket, 
@@ -13,6 +14,7 @@ import {
   ArrowRight
 } from 'lucide-vue-next';
 
+const router = useRouter();
 const store = useAppStore();
 
 onMounted(async () => {
@@ -42,12 +44,14 @@ const recentAlbaranes = computed(() => store.albaranes.slice(0, 5));
       <div class="page-header">
         <div>
           <h1 class="page-title">Mi Resumen</h1>
-          <p class="page-subtitle">Tus tickets y albaranes de {{ store.currentUser?.name }}</p>
+          <p class="page-subtitle">Panel de control de {{ store.currentUser?.empresa?.nombreEmpresa || 'tu empresa' }}</p>
         </div>
+        <router-link to="/tickets" class="btn btn-primary">
+          <Plus style="width: 18px; height: 18px; margin-right: 0.5rem;" />
+          Nuevo Ticket
+        </router-link>
       </div>
-
-      <!-- Tarjetas Resumen para Cliente -->
-      <div class="stats-grid" style="margin-bottom: 2rem;">
+      <div class="stats-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(3, 1fr);">
         <div class="stat-card">
           <div class="stat-icon stat-icon-blue">
             <Ticket />
@@ -75,19 +79,10 @@ const recentAlbaranes = computed(() => store.albaranes.slice(0, 5));
             <div class="stat-value">{{ store.tickets.filter(x => x.status === 'cerrado').length }}</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-blue">
-            <FileText />
-          </div>
-          <div>
-            <div class="stat-label">Mis Albaranes</div>
-            <div class="stat-value">{{ store.albaranes.length }}</div>
-          </div>
-        </div>
       </div>
 
-      <!-- Grid para Cliente: Tickets y Albaranes -->
-      <div class="ticket-detail-grid">
+      <!-- Grid para Cliente: Tickets -->
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
         <!-- Mis Tickets -->
         <div class="card">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -103,48 +98,21 @@ const recentAlbaranes = computed(() => store.albaranes.slice(0, 5));
               <p>No tienes tickets aún.</p>
             </div>
             <div v-else>
-              <div v-for="ticket in recentTickets" :key="ticket._id" class="ticket-list-item" style="cursor: pointer;">
+              <div v-for="ticket in recentTickets" :key="ticket._id" class="ticket-list-item" style="cursor: pointer;" @click="router.push(`/tickets/${ticket._id}`)">
                 <div class="ticket-info">
                   <div class="ticket-title">{{ ticket.title }}</div>
                   <div class="ticket-meta">
                     Creado: {{ new Date(ticket.startDate).toLocaleDateString('es-ES') }}
                     <span v-if="ticket.endDate">• Cerrado: {{ new Date(ticket.endDate).toLocaleDateString('es-ES') }}</span>
+                    <span v-if="ticket.tecnico" style="margin-left: 0.5rem; color: var(--primary);">• Técnico: {{ ticket.tecnico.nombre }}</span>
                   </div>
                 </div>
-                <div class="ticket-badges">
-                  <span class="badge" :class="'badge-' + ticket.status">{{ ticket.status }}</span>
-                  <span class="badge" :class="'badge-' + ticket.priority">{{ ticket.priority }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mis Albaranes -->
-        <div class="card">
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-title">Mis Albaranes</h2>
-            <router-link to="/albaranes" class="btn btn-ghost" style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem;">
-              Ver todos
-              <ArrowRight style="width: 14px; height: 14px;" />
-            </router-link>
-          </div>
-          <div class="card-content">
-            <div v-if="recentAlbaranes.length === 0" class="empty-state">
-              <FileText style="width: 40px; height: 40px; opacity: 0.3; margin-bottom: 1rem;" />
-              <p>No tienes albaranes aún.</p>
-            </div>
-            <div v-else style="display: flex; flex-direction: column; gap: 0.75rem;">
-              <div v-for="albarani in recentAlbaranes" :key="albarani._id" style="padding: 1rem; background-color: var(--muted); border-radius: 0.5rem; border-left: 3px solid var(--primary);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                  <strong style="font-size: 0.95rem;">{{ albarani.numeroAlbaran }}</strong>
-                  <span class="badge" :class="{
-                    'badge-active': albarani.estado === 'entregado',
-                    'badge-inactive': albarani.estado === 'pendiente'
-                  }">{{ albarani.estado }}</span>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--muted-foreground);">
-                  {{ albarani.descripcion || 'Sin descripción' }}
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <div class="ticket-badges">
+                    <span class="badge" :class="'badge-' + ticket.status">{{ ticket.status }}</span>
+                    <span class="badge" :class="'badge-' + ticket.priority">{{ ticket.priority }}</span>
+                  </div>
+                  <ChevronRight style="width: 18px; height: 18px; color: var(--muted-foreground);" />
                 </div>
               </div>
             </div>

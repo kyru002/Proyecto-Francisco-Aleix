@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const AlbaraniSchema = new mongoose.Schema({
+const AlbaranSchema = new mongoose.Schema({
     numeroAlbaran: {
         type: String,
         required: true,
@@ -14,7 +14,7 @@ const AlbaraniSchema = new mongoose.Schema({
     },
     tecnico: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tecnico',
+        ref: 'Trabajador',
         required: false
     },
     ticket: {
@@ -105,7 +105,7 @@ const AlbaraniSchema = new mongoose.Schema({
 });
 
 // Middleware para calcular automáticamente totales
-AlbaraniSchema.pre('save', async function() {
+AlbaranSchema.pre('save', async function () {
     try {
         // Las líneas solo contienen concepto y cantidad (horas)
         // No hay cálculo de subtotal/IVA en este modelo simplificado
@@ -115,4 +115,4 @@ AlbaraniSchema.pre('save', async function() {
     }
 });
 
-module.exports = mongoose.model("Albarani", AlbaraniSchema);
+module.exports = mongoose.model("Albaran", AlbaranSchema);

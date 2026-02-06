@@ -24,7 +24,6 @@ app.use(express.json());
 
 // Routes
 app.use("/api/tickets", require("./routes/tickets"));
-app.use("/api/tecnicos", require("./routes/tecnicos"));
 app.use("/api/clientes", require("./routes/clientes"));
 app.use("/api/albaranes", require("./routes/albaranes"));
 app.use("/api/callLogs", require("./routes/callLogs"));
@@ -44,7 +43,7 @@ io.on("connection", (socket) => {
 
   // DEBUG: Capturar todos los eventos socket para diagnosticar
   const originalOn = socket.on.bind(socket);
-  socket.on = function(event, ...args) {
+  socket.on = function (event, ...args) {
     if (!['disconnect'].includes(event)) {
       console.log(`📡 Listener registrado para evento: "${event}"`);
     }
@@ -64,7 +63,7 @@ io.on("connection", (socket) => {
     const room = `ticket-${ticketId}`;
     socket.join(room);
     console.log(`${userData.name} (${userData.role}) se unió a ${room}`);
-    
+
     // Notificar a otros en la sala
     socket.broadcast.to(room).emit("user-joined", {
       userId: socket.id,
@@ -82,7 +81,7 @@ io.on("connection", (socket) => {
     console.log(`   Type: ${callType}`);
     console.log(`   Room: ${room}`);
     console.log(`   Socket ID: ${socket.id}`);
-    
+
     // Enviar a todos en la sala EXCEPTO al que envia
     console.log(`   📤 Emitiendo 'incoming-call' a otros...`);
     socket.broadcast.to(room).emit("incoming-call", {
@@ -91,7 +90,7 @@ io.on("connection", (socket) => {
       callType: callType,
       offer: offer
     });
-    
+
     console.log(`   ✅ Evento emitido\n`);
   });
 
@@ -104,7 +103,7 @@ io.on("connection", (socket) => {
     console.log(`   Type: ${callType}`);
     console.log(`   Room: ${room}`);
     console.log(`   Socket ID: ${socket.id}`);
-    
+
     // Enviar a todos en la sala EXCEPTO al que envia
     console.log(`   📤 Emitiendo 'call-offer' a otros...`);
     socket.broadcast.to(room).emit("call-offer", {
@@ -113,7 +112,7 @@ io.on("connection", (socket) => {
       callType: callType,
       offer: offer
     });
-    
+
     console.log(`   ✅ Evento emitido\n`);
   });
 
@@ -175,10 +174,10 @@ io.on("connection", (socket) => {
   socket.on("call-started", async (data) => {
     console.log(`\n🔔 EVENTO RECIBIDO: call-started (socket: ${socket.id})`);
     console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
-    
+
     try {
       const { callerSocketId, callerName, receiverSocketId, receiverName, ticketId, callType } = data;
-      
+
       console.log(`📞 Registrando inicio de llamada:`, {
         caller: callerName,
         receiver: receiverName,
@@ -198,10 +197,10 @@ io.on("connection", (socket) => {
       });
 
       const savedCallLog = await newCallLog.save();
-      
+
       // Almacenar el ID del CallLog SOLO para el caller (receiver se añadirá cuando acepte)
       activeCallLogs.set(callerSocketId, savedCallLog._id.toString());
-      
+
       console.log(`✅ CallLog registrado (ID: ${savedCallLog._id}) - esperando aceptación de ${receiverName || 'receptor'}\n`);
     } catch (error) {
       console.error("❌ Error registrando inicio de llamada:", error);
@@ -213,18 +212,18 @@ io.on("connection", (socket) => {
   socket.on("call-accepted", async (data) => {
     console.log(`\n✅ EVENTO RECIBIDO: call-accepted (socket: ${socket.id})`);
     console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
-    
+
     try {
       const { callerSocketId, receiverSocketId, receiverName, ticketId } = data;
-      
+
       console.log(`✅ Registrando aceptación de llamada por socket: ${socket.id}`);
-      
+
       const callLogId = activeCallLogs.get(callerSocketId);
-      
+
       if (callLogId) {
         const updatedCallLog = await CallLog.findByIdAndUpdate(
           callLogId,
-          { 
+          {
             status: "aceptada",
             receiverSocketId: receiverSocketId || socket.id,
             receiverName: receiverName || 'Usuario'
@@ -247,15 +246,15 @@ io.on("connection", (socket) => {
   socket.on("call-rejected", async (data) => {
     try {
       const { callerSocketId } = data;
-      
+
       console.log(`❌ Registrando rechazo de llamada`);
-      
+
       const callLogId = activeCallLogs.get(callerSocketId) || activeCallLogs.get(socket.id);
-      
+
       if (callLogId) {
         await CallLog.findByIdAndUpdate(
           callLogId,
-          { 
+          {
             status: "rechazada",
             endTime: new Date(),
             duration: 0
@@ -275,11 +274,11 @@ io.on("connection", (socket) => {
   socket.on("call-ended", async (data) => {
     try {
       const { duration, screenShared } = data;
-      
+
       console.log(`📞 Registrando término de llamada. Duración: ${duration}s, Screen shared: ${screenShared}`);
-      
+
       const callLogId = activeCallLogs.get(socket.id);
-      
+
       if (callLogId) {
         const updatedCallLog = await CallLog.findByIdAndUpdate(
           callLogId,
@@ -291,14 +290,14 @@ io.on("connection", (socket) => {
           },
           { new: true }
         );
-        
+
         // Limpiar del mapa
         activeCallLogs.forEach((value, key) => {
           if (value === callLogId) {
             activeCallLogs.delete(key);
           }
         });
-        
+
         console.log(`✅ CallLog registrado como completada. Duración total: ${updatedCallLog.duration}s`);
       }
     } catch (error) {

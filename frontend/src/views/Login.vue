@@ -11,27 +11,33 @@ const email = ref('');
 const password = ref('');
 const error = ref('');
 
-const handleLogin = () => {
-  // Simulación de login - múltiples cuentas de prueba
-  const users = {
-    'admin@support.com': { id: "1", name: "Admin Usuario", role: "admin", password: "admin123", clienteId: null },
-    'tecnico@support.com': { id: "2", name: "Juan García (Técnico)", role: "tecnico", password: "tecnico123", clienteId: null },
-    'cliente@support.com': { id: "3", name: "María López (Cliente)", role: "cliente", password: "cliente123", clienteId: "697fd860d39080019956aa07" }
-  };
-
-  const user = users[email.value];
-  
-  if (user && password.value === user.password) {
-    store.login({
-      id: user.id,
-      name: user.name,
-      email: email.value,
-      role: user.role,
-      clienteId: user.clienteId
+const handleLogin = async () => {
+  error.value = '';
+  try {
+    const response = await fetch('http://localhost:5001/api/trabajadores/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value, password: password.value })
     });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Error en autenticación');
+    }
+    
+    store.login({
+      id: data.trabajador._id,
+      name: data.trabajador.nombre,
+      email: data.trabajador.email,
+      role: data.trabajador.role,
+      clienteId: data.trabajador.empresa?._id || data.trabajador.empresa,
+      token: data.token
+    });
+    
     router.push('/dashboard');
-  } else {
-    error.value = 'Credenciales no válidas. Consulta la sección de cuentas de demostración.';
+  } catch (err) {
+    error.value = err.message || 'Error al conectar con el servidor';
   }
 };
 </script>
@@ -44,7 +50,7 @@ const handleLogin = () => {
           <Ticket />
         </div>
         <h1 class="login-title">SupportDesk</h1>
-        <p class="login-description">Ingresa a tu cuenta para gestionar el soporte</p>
+        <p class="login-description">Loguéate si eres una empresa o trabajador</p>
       </div>
 
       <div class="login-body">
@@ -75,6 +81,13 @@ const handleLogin = () => {
           </button>
         </form>
 
+        <div style="margin-top: 1.5rem; text-align: center;">
+          <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 0.5rem;">¿Eres una empresa nueva?</p>
+          <router-link to="/register" class="btn btn-ghost" style="width: 100%;">
+            Registrar mi Empresa
+          </router-link>
+        </div>
+
         <div class="login-demo">
           <div class="login-demo-title">CUENTAS DE DEMOSTRACIÓN</div>
           <div class="login-demo-credentials">
@@ -83,15 +96,10 @@ const handleLogin = () => {
               Email: <strong>admin@support.com</strong><br>
               Pass: <strong>admin123</strong>
             </div>
-            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+            <div>
               <strong style="color: #f59e0b;">Técnico:</strong><br>
               Email: <strong>tecnico@support.com</strong><br>
               Pass: <strong>tecnico123</strong>
-            </div>
-            <div>
-              <strong style="color: #10b981;">Cliente:</strong><br>
-              Email: <strong>cliente@support.com</strong><br>
-              Pass: <strong>cliente123</strong>
             </div>
           </div>
         </div>

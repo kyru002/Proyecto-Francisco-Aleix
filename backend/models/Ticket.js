@@ -30,7 +30,7 @@ const TicketSchema = new mongoose.Schema({
     },
     tecnico: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tecnico',
+        ref: 'Trabajador',
         required: false
     },
     startDate: {
@@ -49,7 +49,7 @@ const TicketSchema = new mongoose.Schema({
             },
             role: {
                 type: String,
-                enum: ["cliente", "tecnico", "admin"],
+                enum: ["cliente", "tecnico", "trabajador", "admin"],
                 required: true
             },
             content: {

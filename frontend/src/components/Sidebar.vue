@@ -17,11 +17,11 @@ const router = useRouter();
 const store = useAppStore();
 
 const allNavItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'tecnico', 'cliente'] },
-  { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['admin', 'tecnico', 'cliente'] },
-  { name: 'Albaranes', path: '/albaranes', icon: FileText, roles: ['admin', 'tecnico', 'cliente'] },
-  { name: 'Equipo', path: '/technicians', icon: Users, roles: ['admin', 'tecnico'] },
-  { name: 'Clientes', path: '/clients', icon: Users, roles: ['admin', 'tecnico'] },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin'] },
+  { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['admin', 'trabajador', 'cliente'] },
+  { name: 'Albaranes', path: '/albaranes', icon: FileText, roles: ['admin', 'trabajador'] },
+  { name: 'Equipo', path: '/technicians', icon: Users, roles: ['admin'] },
+  { name: 'Clientes', path: '/clients', icon: Users, roles: ['admin'] },
 ];
 
 const navItems = computed(() => {

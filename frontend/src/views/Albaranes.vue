@@ -18,12 +18,12 @@ const store = useAppStore();
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const showMenuId = ref(null);
-const editingAlbarani = ref(null);
+const editingAlbaran = ref(null);
 const searchQuery = ref('');
 const filterEstado = ref('');
 const filterTecnico = ref('');
 
-const newAlbarani = ref({
+const newAlbaran = ref({
   numeroAlbaran: '',
   cliente: '',
   tecnico: '',
@@ -76,8 +76,8 @@ onMounted(async () => {
       // Generar el número de albarán automáticamente
       const numeroAlbaranGenerado = await generarNumeroAlbaran();
       
-      newAlbarani.value = {
-        ...newAlbarani.value,
+      newAlbaran.value = {
+        ...newAlbaran.value,
         ...data,
         numeroAlbaran: numeroAlbaranGenerado
       };
@@ -92,11 +92,11 @@ onMounted(async () => {
 });
 
 const albaranesFiltered = computed(() => {
-  return store.albaranes.filter(albarani => {
-    const matchesSearch = albarani.numeroAlbaran.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                          (albarani.cliente?.nombreEmpresa || '').toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesEstado = !filterEstado.value || albarani.estado === filterEstado.value;
-    const matchesTecnico = !filterTecnico.value || albarani.tecnico?._id === filterTecnico.value;
+  return store.albaranes.filter(albaran => {
+    const matchesSearch = albaran.numeroAlbaran.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                          (albaran.cliente?.nombreEmpresa || '').toLowerCase().includes(searchQuery.value.toLowerCase());
+    const matchesEstado = !filterEstado.value || albaran.estado === filterEstado.value;
+    const matchesTecnico = !filterTecnico.value || albaran.tecnico?._id === filterTecnico.value;
     return matchesSearch && matchesEstado && matchesTecnico;
   });
 });
@@ -119,7 +119,7 @@ const agregarLinea = () => {
   }
   
   // Agregar la línea con valores parseados correctamente
-  newAlbarani.value.lineas.push({
+  newAlbaran.value.lineas.push({
     concepto: newLinea.value.concepto.trim(),
     cantidad: parseFloat(newLinea.value.cantidad)
   });
@@ -134,29 +134,29 @@ const agregarLinea = () => {
 };
 
 const eliminarLinea = (index) => {
-  newAlbarani.value.lineas.splice(index, 1);
+  newAlbaran.value.lineas.splice(index, 1);
 };
 
-const handleCreateAlbarani = async () => {
+const handleCreateAlbaran = async () => {
   try {
     // Validar campos requeridos
-    if (!newAlbarani.value.numeroAlbaran || newAlbarani.value.numeroAlbaran.trim() === '') {
+    if (!newAlbaran.value.numeroAlbaran || newAlbaran.value.numeroAlbaran.trim() === '') {
       alert('Por favor, ingresa el número de albarán');
       return;
     }
     
-    if (!newAlbarani.value.cliente) {
+    if (!newAlbaran.value.cliente) {
       alert('Por favor, selecciona un cliente');
       return;
     }
     
-    if (newAlbarani.value.lineas.length === 0) {
+    if (newAlbaran.value.lineas.length === 0) {
       alert('Debes agregar al menos una línea. Completa los campos (Concepto, Cantidad, Precio) y haz clic en el botón "+" para agregar');
       return;
     }
 
     // Validar que todas las líneas tengan concepto y cantidad
-    const lineasValidas = newAlbarani.value.lineas.every(linea => {
+    const lineasValidas = newAlbaran.value.lineas.every(linea => {
       console.log('Validando línea:', linea);
       return linea.concepto && 
              linea.concepto.trim() !== '' &&
@@ -166,32 +166,32 @@ const handleCreateAlbarani = async () => {
 
     if (!lineasValidas) {
       alert('Todas las líneas deben tener concepto y cantidad (horas) válidos');
-      console.error('Líneas inválidas:', newAlbarani.value.lineas);
+      console.error('Líneas inválidas:', newAlbaran.value.lineas);
       return;
     }
 
     // Preparar datos con tipos correctos
-    const datosAlbarani = {
-      numeroAlbaran: newAlbarani.value.numeroAlbaran.trim(),
-      cliente: newAlbarani.value.cliente,
-      tecnico: newAlbarani.value.tecnico || null,
-      ticket: newAlbarani.value.ticket || null,
+    const datosAlbaran = {
+      numeroAlbaran: newAlbaran.value.numeroAlbaran.trim(),
+      cliente: newAlbaran.value.cliente,
+      tecnico: newAlbaran.value.tecnico || null,
+      ticket: newAlbaran.value.ticket || null,
       estado: 'pendiente',
-      descripcion: newAlbarani.value.descripcion || '',
-      lineas: newAlbarani.value.lineas.map(linea => ({
+      descripcion: newAlbaran.value.descripcion || '',
+      lineas: newAlbaran.value.lineas.map(linea => ({
         concepto: String(linea.concepto).trim(),
         cantidad: Number(linea.cantidad)
       })),
-      notas: newAlbarani.value.notas || ''
+      notas: newAlbaran.value.notas || ''
     };
 
-    console.log('Enviando albarán:', JSON.stringify(datosAlbarani, null, 2));
+    console.log('Enviando albarán:', JSON.stringify(datosAlbaran, null, 2));
     
-    const respuesta = await store.createAlbarani(datosAlbarani);
+    const respuesta = await store.createAlbaran(datosAlbaran);
     console.log('Respuesta del servidor:', respuesta);
     
     showCreateModal.value = false;
-    newAlbarani.value = {
+    newAlbaran.value = {
       numeroAlbaran: '',
       cliente: '',
       tecnico: '',
@@ -210,26 +210,26 @@ const handleCreateAlbarani = async () => {
   }
 };
 
-const handleEditAlbarani = (albarani) => {
-  editingAlbarani.value = { ...albarani };
+const handleEditAlbaran = (albaran) => {
+  editingAlbaran.value = { ...albaran };
   showEditModal.value = true;
   showMenuId.value = null;
 };
 
 const handleSaveEdit = async () => {
   try {
-    await store.updateAlbarani(editingAlbarani.value._id, editingAlbarani.value);
+    await store.updateAlbaran(editingAlbaran.value._id, editingAlbaran.value);
     showEditModal.value = false;
-    editingAlbarani.value = null;
+    editingAlbaran.value = null;
   } catch (error) {
     alert('Error al actualizar el albarán: ' + error.message);
   }
 };
 
-const handleDeleteAlbarani = async (albaraniId) => {
+const handleDeleteAlbaran = async (albaranId) => {
   if (confirm('¿Estás seguro de que quieres eliminar este albarán?')) {
     try {
-      await store.deleteAlbarani(albaraniId);
+      await store.deleteAlbaran(albaranId);
       showMenuId.value = null;
     } catch (error) {
       alert('Error al eliminar el albarán');
@@ -237,24 +237,24 @@ const handleDeleteAlbarani = async (albaraniId) => {
   }
 };
 
-const handleEntregarAlbarani = async (albaraniId) => {
+const handleEntregarAlbaran = async (albaranId) => {
   const nombre = prompt('Nombre del firmante:');
   if (nombre) {
     try {
-      await store.entregarAlbarani(albaraniId, { nombre });
+      await store.entregarAlbaran(albaranId, { nombre });
     } catch (error) {
       alert('Error al marcar como entregado: ' + error.message);
     }
   }
 };
 
-const toggleMenu = (albaraniId) => {
-  showMenuId.value = showMenuId.value === albaraniId ? null : albaraniId;
+const toggleMenu = (albaranId) => {
+  showMenuId.value = showMenuId.value === albaranId ? null : albaranId;
 };
 
-const calcularTotales = (albarani) => {
-  const subtotal = albarani.lineas.reduce((sum, linea) => sum + (linea.importe || 0), 0);
-  const iva = subtotal * (albarani.porcentajeIVA / 100);
+const calcularTotales = (albaran) => {
+  const subtotal = albaran.lineas.reduce((sum, linea) => sum + (linea.importe || 0), 0);
+  const iva = subtotal * (albaran.porcentajeIVA / 100);
   return {
     subtotal: subtotal.toFixed(2),
     iva: iva.toFixed(2),
@@ -300,7 +300,7 @@ const getEstadoColor = (estado) => {
           <option value="devuelto">Devuelto</option>
           <option value="cancelado">Cancelado</option>
         </select>
-        <select v-model="filterTecnico" class="form-input form-select">
+        <select v-if="store.currentUser?.role !== 'cliente'" v-model="filterTecnico" class="form-input form-select">
           <option value="">Todos los técnicos</option>
           <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre }}</option>
         </select>
@@ -314,50 +314,58 @@ const getEstadoColor = (estado) => {
     </div>
 
     <div v-else class="card" style="padding: 1rem;">
-      <div v-for="albarani in albaranesFiltered" :key="albarani._id" style="padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 100px; gap: 1rem; align-items: center;">
+      <div v-for="albaran in albaranesFiltered" :key="albaran._id" style="padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+        <div style="display: grid; gap: 1rem; align-items: center;" :style="{ gridTemplateColumns: store.currentUser?.role === 'cliente' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr 1fr 100px' }">
           <!-- Número de Albarán -->
           <div>
-            <div style="font-weight: 600; font-size: 0.95rem;">{{ albarani.numeroAlbaran }}</div>
-            <div style="font-size: 0.75rem; color: var(--muted-foreground);">{{ new Date(albarani.fechaAlbaran).toLocaleDateString() }}</div>
+            <div style="font-weight: 600; font-size: 0.95rem;">{{ albaran.numeroAlbaran }}</div>
+            <div style="font-size: 0.75rem; color: var(--muted-foreground);">{{ new Date(albaran.fechaAlbaran).toLocaleDateString() }}</div>
+          </div>
+          
+          <!-- Cliente (Solo para Admin/Trabajador) -->
+          <div v-if="store.currentUser?.role !== 'cliente'">
+            <div style="font-size: 0.875rem; font-weight: 500;">{{ albaran.cliente?.nombreEmpresa || 'N/A' }}</div>
+            <div style="font-size: 0.75rem; color: var(--muted-foreground);">{{ albaran.cliente?.nombreContacto || '' }}</div>
           </div>
 
-          <!-- Cliente -->
+          <!-- Tiempo (Horas Totales) -->
           <div>
-            <div style="font-size: 0.875rem; font-weight: 500;">{{ albarani.cliente?.nombreEmpresa || 'N/A' }}</div>
-            <div style="font-size: 0.75rem; color: var(--muted-foreground);">{{ albarani.cliente?.nombreContacto || '' }}</div>
+            <div style="font-weight: 600; font-size: 0.95rem;">
+              {{ albaran.lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0) }}h
+            </div>
+            <div style="font-size: 0.75rem; color: var(--muted-foreground);">Tiempo Total</div>
           </div>
 
-          <!-- Técnico -->
-          <div>
-            <div style="font-size: 0.875rem; font-weight: 500;">{{ albarani.tecnico?.nombre || 'Sin técnico' }}</div>
+          <!-- Técnico (Solo para Admin/Trabajador) -->
+          <div v-if="store.currentUser?.role !== 'cliente'">
+            <div style="font-size: 0.875rem; font-weight: 500;">{{ albaran.tecnico?.nombre || 'Sin técnico' }}</div>
             <div style="font-size: 0.75rem; color: var(--muted-foreground);">Técnico</div>
           </div>
 
           <!-- Importe Total -->
           <div>
-            <div style="font-weight: 600; font-size: 0.95rem;">{{ calcularTotales(albarani).total }}€</div>
-            <div style="font-size: 0.75rem; color: var(--muted-foreground);">Total</div>
+            <div style="font-weight: 700; font-size: 1rem; color: var(--primary);">{{ calcularTotales(albaran).total }}€</div>
+            <div style="font-size: 0.75rem; color: var(--muted-foreground);">Precio Total</div>
           </div>
 
           <!-- Estado -->
           <div>
-            <span class="badge" :class="getEstadoColor(albarani.estado)">{{ albarani.estado }}</span>
+            <span class="badge" :class="getEstadoColor(albaran.estado)">{{ albaran.estado }}</span>
           </div>
 
-          <!-- Acciones -->
-          <div style="position: relative; display: flex; justify-content: flex-end;">
-            <button @click="toggleMenu(albarani._id)" class="btn btn-ghost btn-icon">
+          <!-- Acciones (Ocultar para Clientes) -->
+          <div v-if="store.currentUser?.role !== 'cliente'" style="position: relative; display: flex; justify-content: flex-end;">
+            <button @click="toggleMenu(albaran._id)" class="btn btn-ghost btn-icon">
               <MoreVertical />
             </button>
-            <div v-if="showMenuId === albarani._id" style="position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; min-width: 150px;">
-              <button @click="handleEditAlbarani(albarani)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem;" type="button">
+            <div v-if="showMenuId === albaran._id" style="position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; min-width: 150px;">
+              <button @click="handleEditAlbaran(albaran)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem;" type="button">
                 Editar
               </button>
-              <button @click="handleEntregarAlbarani(albarani._id)" v-if="albarani.estado === 'pendiente'" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--primary);" type="button">
+              <button @click="handleEntregarAlbaran(albaran._id)" v-if="albaran.estado === 'pendiente'" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--primary);" type="button">
                 Entregar
               </button>
-              <button @click="handleDeleteAlbarani(albarani._id)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--destructive);" type="button">
+              <button @click="handleDeleteAlbaran(albaran._id)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; font-size: 0.875rem; color: var(--destructive);" type="button">
                 Eliminar
               </button>
             </div>
@@ -374,7 +382,7 @@ const getEstadoColor = (estado) => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(linea, index) in albarani.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
+              <tr v-for="(linea, index) in albaran.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 0.5rem;">{{ linea.concepto }}</td>
                 <td style="text-align: center; padding: 0.5rem;">{{ linea.cantidad }}</td>
               </tr>
@@ -390,16 +398,16 @@ const getEstadoColor = (estado) => {
         <div class="modal-header">
           <h2 class="modal-title">Crear Nuevo Albarán</h2>
         </div>
-        <form @submit.prevent="handleCreateAlbarani">
+        <form @submit.prevent="handleCreateAlbaran">
           <div class="modal-body">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
                 <label class="form-label">Número de Albarán</label>
-                <input v-model="newAlbarani.numeroAlbaran" type="text" class="form-input" required placeholder="ALB-2026-001">
+                <input v-model="newAlbaran.numeroAlbaran" type="text" class="form-input" required placeholder="ALB-2026-001">
               </div>
               <div class="form-group">
                 <label class="form-label">Cliente *</label>
-                <select v-model="newAlbarani.cliente" class="form-input form-select" required>
+                <select v-model="newAlbaran.cliente" class="form-input form-select" required>
                   <option value="" disabled>Seleccionar cliente</option>
                   <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa }} ({{ c.nombreContacto }})</option>
                 </select>
@@ -409,14 +417,14 @@ const getEstadoColor = (estado) => {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
                 <label class="form-label">Técnico</label>
-                <select v-model="newAlbarani.tecnico" class="form-input form-select">
+                <select v-model="newAlbaran.tecnico" class="form-input form-select">
                   <option value="">Sin asignar</option>
                   <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre }}</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Ticket</label>
-                <select v-model="newAlbarani.ticket" class="form-input form-select">
+                <select v-model="newAlbaran.ticket" class="form-input form-select">
                   <option value="">Sin vincular</option>
                   <option v-for="tk in store.tickets" :key="tk._id" :value="tk._id">#{{ tk._id?.slice(-6) }} - {{ tk.title }}</option>
                 </select>
@@ -425,7 +433,7 @@ const getEstadoColor = (estado) => {
 
             <div class="form-group">
               <label class="form-label">Descripción</label>
-              <input v-model="newAlbarani.descripcion" type="text" class="form-input" placeholder="Descripción general del albarán">
+              <input v-model="newAlbaran.descripcion" type="text" class="form-input" placeholder="Descripción general del albarán">
             </div>
 
             <!-- Agregar líneas -->
@@ -448,8 +456,8 @@ const getEstadoColor = (estado) => {
               </div>
 
               <!-- Tabla de líneas agregadas -->
-              <div v-if="newAlbarani.lineas.length > 0" style="margin-bottom: 1rem; padding: 1rem; background-color: var(--muted); border-radius: var(--radius);">
-                <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem;">✓ {{ newAlbarani.lineas.length }} línea(s) agregada(s)</p>
+              <div v-if="newAlbaran.lineas.length > 0" style="margin-bottom: 1rem; padding: 1rem; background-color: var(--muted); border-radius: var(--radius);">
+                <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem;">✓ {{ newAlbaran.lineas.length }} línea(s) agregada(s)</p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
                   <thead>
                     <tr style="border-bottom: 1px solid var(--border);">
@@ -459,7 +467,7 @@ const getEstadoColor = (estado) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(linea, index) in newAlbarani.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
+                    <tr v-for="(linea, index) in newAlbaran.lineas" :key="index" style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 0.5rem;">{{ linea.concepto }}</td>
                       <td style="text-align: center; padding: 0.5rem;">{{ linea.cantidad }}</td>
                       <td style="text-align: center; padding: 0.5rem;">
@@ -477,13 +485,13 @@ const getEstadoColor = (estado) => {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
               <div class="form-group">
                 <label class="form-label">Notas</label>
-                <input v-model="newAlbarani.notas" type="text" class="form-input" placeholder="Notas adicionales">
+                <input v-model="newAlbaran.notas" type="text" class="form-input" placeholder="Notas adicionales">
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Observaciones</label>
-              <textarea v-model="newAlbarani.observaciones" class="form-input form-textarea" placeholder="Observaciones..." style="min-height: 60px;"></textarea>
+              <textarea v-model="newAlbaran.observaciones" class="form-input form-textarea" placeholder="Observaciones..." style="min-height: 60px;"></textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -500,16 +508,16 @@ const getEstadoColor = (estado) => {
         <div class="modal-header">
           <h2 class="modal-title">Editar Albarán</h2>
         </div>
-        <form @submit.prevent="handleSaveEdit" v-if="editingAlbarani">
+        <form @submit.prevent="handleSaveEdit" v-if="editingAlbaran">
           <div class="modal-body">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
                 <label class="form-label">Número de Albarán</label>
-                <input v-model="editingAlbarani.numeroAlbaran" type="text" class="form-input" required>
+                <input v-model="editingAlbaran.numeroAlbaran" type="text" class="form-input" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Estado</label>
-                <select v-model="editingAlbarani.estado" class="form-input form-select">
+                <select v-model="editingAlbaran.estado" class="form-input form-select">
                   <option value="pendiente">Pendiente</option>
                   <option value="entregado">Entregado</option>
                   <option value="devuelto">Devuelto</option>
@@ -520,23 +528,23 @@ const getEstadoColor = (estado) => {
 
             <div class="form-group">
               <label class="form-label">Descripción</label>
-              <input v-model="editingAlbarani.descripcion" type="text" class="form-input">
+              <input v-model="editingAlbaran.descripcion" type="text" class="form-input">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
                 <label class="form-label">% IVA</label>
-                <input v-model.number="editingAlbarani.porcentajeIVA" type="number" class="form-input" step="0.01" min="0">
+                <input v-model.number="editingAlbaran.porcentajeIVA" type="number" class="form-input" step="0.01" min="0">
               </div>
               <div class="form-group">
                 <label class="form-label">Notas</label>
-                <input v-model="editingAlbarani.notas" type="text" class="form-input">
+                <input v-model="editingAlbaran.notas" type="text" class="form-input">
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Observaciones</label>
-              <textarea v-model="editingAlbarani.observaciones" class="form-input form-textarea" style="min-height: 60px;"></textarea>
+              <textarea v-model="editingAlbaran.observaciones" class="form-input form-textarea" style="min-height: 60px;"></textarea>
             </div>
           </div>
           <div class="modal-footer">

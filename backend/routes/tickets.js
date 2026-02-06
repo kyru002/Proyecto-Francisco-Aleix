@@ -6,19 +6,23 @@ const Ticket = require("../models/Ticket");
 router.get("/", async (req, res) => {
     try {
         const { clienteId } = req.query;
-        
+
         // Construir filtro
         const filter = {};
-        if (clienteId) {
+
+        // Si no es admin/trabajador, forzar filtro por su propia empresa
+        // Nota: En un entorno real esto debería venir del token decodificado
+        if (clienteId && clienteId !== 'undefined' && clienteId !== 'null') {
             filter.cliente = clienteId;
         }
-        
+
         const tickets = await Ticket.find(filter)
             .populate('cliente')
             .populate('tecnico')
             .sort({ createdAt: -1 });
         res.json(tickets);
     } catch (error) {
+        console.error("Error al obtener tickets:", error);
         res.status(500).json({ msg: "Error al obtener los tickets" });
     }
 });
@@ -98,8 +102,8 @@ router.put("/:id", async (req, res) => {
             req.body,
             { new: true }
         )
-        .populate('cliente')
-        .populate('tecnico');
+            .populate('cliente')
+            .populate('tecnico');
         res.json(updatedTicket);
     } catch (error) {
         res.status(500).json({ msg: "Error al actualizar el ticket" });

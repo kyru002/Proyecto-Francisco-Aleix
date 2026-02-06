@@ -1,17 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const Albarani = require("../models/Albarani");
+const Albaran = require("../models/Albaran");
 const Cliente = require("../models/Cliente");
-const Tecnico = require("../models/Tecnico");
+const Trabajador = require("../models/Trabajador");
 
 // Obtener próximo número de albarán (DEBE estar antes de /:id)
 router.get("/numero/siguiente", async (req, res) => {
     try {
-        const ultimoAlbarani = await Albarani.findOne().sort({ createdAt: -1 });
-        
+        const ultimoAlbaran = await Albaran.findOne().sort({ createdAt: -1 });
+
         let proximoNumero = "ALB-2026-001";
-        if (ultimoAlbarani && ultimoAlbarani.numeroAlbaran) {
-            const partes = ultimoAlbarani.numeroAlbaran.split('-');
+        if (ultimoAlbaran && ultimoAlbaran.numeroAlbaran) {
+            const partes = ultimoAlbaran.numeroAlbaran.split('-');
             const numero = parseInt(partes[partes.length - 1]) + 1;
             proximoNumero = `ALB-${new Date().getFullYear()}-${String(numero).padStart(3, '0')}`;
         }
@@ -25,7 +25,7 @@ router.get("/numero/siguiente", async (req, res) => {
 // Obtener albaranes por estado (DEBE estar antes de /:id)
 router.get("/estado/:estado", async (req, res) => {
     try {
-        const albaranes = await Albarani.find({ estado: req.params.estado })
+        const albaranes = await Albaran.find({ estado: req.params.estado })
             .populate('cliente')
             .populate('tecnico')
             .populate('ticket')
@@ -39,7 +39,7 @@ router.get("/estado/:estado", async (req, res) => {
 // Obtener albaranes por cliente (DEBE estar antes de /:id)
 router.get("/cliente/:clienteId", async (req, res) => {
     try {
-        const albaranes = await Albarani.find({ cliente: req.params.clienteId })
+        const albaranes = await Albaran.find({ cliente: req.params.clienteId })
             .populate('cliente')
             .populate('tecnico')
             .populate('ticket')
@@ -56,8 +56,8 @@ router.get("/", async (req, res) => {
         const { cliente } = req.query;
         const filter = {};
         if (cliente) filter.cliente = cliente;
-        
-        const albaranes = await Albarani.find(filter)
+
+        const albaranes = await Albaran.find(filter)
             .populate('cliente')
             .populate('tecnico')
             .populate('ticket')
@@ -71,16 +71,16 @@ router.get("/", async (req, res) => {
 // Obtener un albarán por ID (DEBE estar después de las rutas específicas)
 router.get("/:id", async (req, res) => {
     try {
-        const albarani = await Albarani.findById(req.params.id)
+        const albaran = await Albaran.findById(req.params.id)
             .populate('cliente')
             .populate('tecnico')
             .populate('ticket');
-        
-        if (!albarani) {
+
+        if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
-        
-        res.json(albarani);
+
+        res.json(albaran);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener el albarán", error: error.message });
     }
@@ -90,7 +90,7 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
     try {
         console.log('POST /albaranes - Datos recibidos:', JSON.stringify(req.body, null, 2));
-        
+
         const { numeroAlbaran, cliente, tecnico, ticket, descripcion, lineas, porcentajeIVA, notas, observaciones } = req.body;
 
         // Validar campos requeridos
@@ -114,12 +114,12 @@ router.post("/", async (req, res) => {
         for (let i = 0; i < lineas.length; i++) {
             const linea = lineas[i];
             console.log(`Línea ${i}:`, linea);
-            
+
             if (!linea.concepto || linea.concepto.toString().trim() === '') {
                 console.error(`Error en línea ${i}: concepto no válido`);
                 return res.status(400).json({ message: `Línea ${i + 1}: el concepto es requerido` });
             }
-            
+
             if (typeof linea.cantidad !== 'number' || linea.cantidad <= 0) {
                 console.error(`Error en línea ${i}: cantidad no válida. Valor:`, linea.cantidad, 'Tipo:', typeof linea.cantidad);
                 return res.status(400).json({ message: `Línea ${i + 1}: la cantidad (horas) debe ser un número mayor a 0` });
@@ -139,7 +139,7 @@ router.post("/", async (req, res) => {
         // Validar que el técnico exista (si se proporciona)
         if (tecnico && tecnico !== null && tecnico.toString().trim() !== '') {
             console.log('Buscando técnico con ID:', tecnico);
-            const tecnicoExistente = await Tecnico.findById(tecnico);
+            const tecnicoExistente = await Trabajador.findById(tecnico);
             if (!tecnicoExistente) {
                 console.error('Técnico no encontrado:', tecnico);
                 return res.status(404).json({ message: "Técnico no encontrado" });
@@ -161,7 +161,7 @@ router.post("/", async (req, res) => {
 
         // Crear el albarán
         console.log('Creando nuevo albarán...');
-        const nuevoAlbarani = new Albarani({
+        const nuevoAlbaran = new Albaran({
             numeroAlbaran: numeroAlbaran.trim(),
             cliente,
             tecnico: tecnico && tecnico.toString().trim() !== '' ? tecnico : null,
@@ -175,20 +175,20 @@ router.post("/", async (req, res) => {
             observaciones: observaciones || ''
         });
 
-        console.log('Albarán antes de guardar:', JSON.stringify(nuevoAlbarani, null, 2));
-        
-        const albaraniGuardado = await nuevoAlbarani.save();
-        console.log('Albarán guardado con éxito. ID:', albaraniGuardado._id);
-        
-        const albaraniPopulado = await albaraniGuardado.populate(['cliente', 'tecnico', 'ticket']);
-        
+        console.log('Albarán antes de guardar:', JSON.stringify(nuevoAlbaran, null, 2));
+
+        const albaranGuardado = await nuevoAlbaran.save();
+        console.log('Albarán guardado con éxito. ID:', albaranGuardado._id);
+
+        const albaranPopulado = await albaranGuardado.populate(['cliente', 'tecnico', 'ticket']);
+
         console.log('Albarán creado y poblado exitosamente');
-        res.status(201).json(albaraniPopulado);
-        
+        res.status(201).json(albaranPopulado);
+
     } catch (error) {
         console.error('Error al crear albarán:', error);
         console.error('Stack:', error.stack);
-        res.status(500).json({ 
+        res.status(500).json({
             message: "Error al crear el albarán",
             error: error.message,
             details: error.errors
@@ -211,7 +211,7 @@ router.put("/:id", async (req, res) => {
 
         // Validar técnico si se actualiza
         if (tecnico) {
-            const tecnicoExistente = await Tecnico.findById(tecnico);
+            const tecnicoExistente = await Trabajador.findById(tecnico);
             if (!tecnicoExistente) {
                 return res.status(404).json({ message: "Técnico no encontrado" });
             }
@@ -231,17 +231,17 @@ router.put("/:id", async (req, res) => {
             firmante
         };
 
-        const albarani = await Albarani.findByIdAndUpdate(
+        const albaran = await Albaran.findByIdAndUpdate(
             req.params.id,
             actualizacion,
             { new: true, runValidators: true }
         ).populate(['cliente', 'tecnico', 'ticket']);
 
-        if (!albarani) {
+        if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
 
-        res.json(albarani);
+        res.json(albaran);
     } catch (error) {
         res.status(400).json({ message: "Error al actualizar el albarán", error: error.message });
     }
@@ -256,17 +256,17 @@ router.patch("/:id/estado", async (req, res) => {
             return res.status(400).json({ message: "Estado inválido" });
         }
 
-        const albarani = await Albarani.findByIdAndUpdate(
+        const albaran = await Albaran.findByIdAndUpdate(
             req.params.id,
             { estado },
             { new: true }
         ).populate(['cliente', 'tecnico', 'ticket']);
 
-        if (!albarani) {
+        if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
 
-        res.json(albarani);
+        res.json(albaran);
     } catch (error) {
         res.status(400).json({ message: "Error al cambiar el estado", error: error.message });
     }
@@ -277,7 +277,7 @@ router.patch("/:id/entregar", async (req, res) => {
     try {
         const { firmante } = req.body;
 
-        const albarani = await Albarani.findByIdAndUpdate(
+        const albaran = await Albaran.findByIdAndUpdate(
             req.params.id,
             {
                 estado: 'entregado',
@@ -287,11 +287,11 @@ router.patch("/:id/entregar", async (req, res) => {
             { new: true }
         ).populate(['cliente', 'tecnico', 'ticket']);
 
-        if (!albarani) {
+        if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
 
-        res.json(albarani);
+        res.json(albaran);
     } catch (error) {
         res.status(400).json({ message: "Error al marcar como entregado", error: error.message });
     }
@@ -300,13 +300,13 @@ router.patch("/:id/entregar", async (req, res) => {
 // Eliminar albarán
 router.delete("/:id", async (req, res) => {
     try {
-        const albarani = await Albarani.findByIdAndDelete(req.params.id);
+        const albaran = await Albaran.findByIdAndDelete(req.params.id);
 
-        if (!albarani) {
+        if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
 
-        res.json({ message: "Albarán eliminado correctamente", albarani });
+        res.json({ message: "Albarán eliminado correctamente", albaran });
     } catch (error) {
         res.status(500).json({ message: "Error al eliminar el albarán", error: error.message });
     }

@@ -241,7 +241,7 @@ const getTrabajadoresEmpresa = (clientId) => {
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">Empresas</h1>
-      <button @click="openCreateModal" class="btn btn-primary">
+      <button v-if="store.currentUser?.role === 'admin'" @click="openCreateModal" class="btn btn-primary">
         <Plus style="width: 18px; height: 18px;" />
         Nueva Empresa
       </button>
@@ -327,6 +327,7 @@ const getTrabajadoresEmpresa = (clientId) => {
             </div>
             
             <button
+              v-if="store.currentUser?.role === 'admin'"
               @click.stop="editClient(cliente)"
               class="btn btn-ghost btn-icon"
               title="Editar empresa"
@@ -335,6 +336,7 @@ const getTrabajadoresEmpresa = (clientId) => {
             </button>
             
             <button
+              v-if="store.currentUser?.role === 'admin'"
               @click.stop="handleDeleteClient(cliente._id)"
               class="btn btn-ghost btn-icon"
               title="Eliminar empresa"

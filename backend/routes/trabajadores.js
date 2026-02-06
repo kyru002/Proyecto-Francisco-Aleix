@@ -7,6 +7,18 @@ const bcrypt = require("bcryptjs");
 
 const JWT_SECRET = process.env.JWT_SECRET || "tu-clave-secreta-muy-segura";
 
+// Obtener todos los trabajadores que NO son clientes (Equipo de Soporte/Admin)
+router.get("/equipo", async (req, res) => {
+    try {
+        const equipo = await Trabajador.find({ role: { $ne: "cliente" } })
+            .select("-password")
+            .sort({ nombre: 1 });
+        res.json(equipo);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener equipo técnico", error: error.message });
+    }
+});
+
 // Obtener todos los trabajadores de una empresa
 router.get("/empresa/:empresaId", async (req, res) => {
     try {
@@ -38,14 +50,16 @@ router.post("/", async (req, res) => {
         const { nombre, email, telefono, puesto, empresa } = req.body;
 
         // Validar campos requeridos
-        if (!nombre || !email || !puesto || !empresa) {
-            return res.status(400).json({ message: "Los campos nombre, email, puesto y empresa son requeridos" });
+        if (!nombre || !email || !puesto) {
+            return res.status(400).json({ message: "Los campos nombre, email y puesto son requeridos" });
         }
 
-        // Validar que la empresa exista
-        const empresaExistente = await Cliente.findById(empresa);
-        if (!empresaExistente) {
-            return res.status(404).json({ message: "Empresa no encontrada" });
+        // Validar que la empresa exista (si se proporciona)
+        if (empresa) {
+            const empresaExistente = await Cliente.findById(empresa);
+            if (!empresaExistente) {
+                return res.status(404).json({ message: "Empresa no encontrada" });
+            }
         }
 
         // Verificar que el email no exista ya
@@ -70,7 +84,7 @@ router.post("/", async (req, res) => {
         });
 
         const trabajadorGuardado = await nuevoTrabajador.save();
-        const trabajadorPopulado = await trabajadorGuardado.populate("empresa");
+        const trabajadorPopulado = empresa ? await trabajadorGuardado.populate("empresa") : trabajadorGuardado;
 
         // Devolver el trabajador CON la contraseña temporal en texto plano (solo en creación)
         const response = trabajadorPopulado.toObject();
@@ -153,7 +167,74 @@ router.patch("/:id/cambiar-password", async (req, res) => {
     }
 });
 
-// Login para trabajadores
+// Registro para nuevas empresas
+router.post("/auth/register-empresa", async (req, res) => {
+    try {
+        const { nombreEmpresa, nombreContacto, email, password, telefono } = req.body;
+
+        if (!nombreEmpresa || !nombreContacto || !email || !password) {
+            return res.status(400).json({ message: "Todos los campos son requeridos" });
+        }
+
+        // Verificar si el email ya existe en Trabajador o Cliente
+        const [usuarioExistente, clienteExistente] = await Promise.all([
+            Trabajador.findOne({ email: email.toLowerCase() }),
+            Cliente.findOne({ email: email.toLowerCase() })
+        ]);
+
+        if (usuarioExistente || clienteExistente) {
+            return res.status(400).json({ message: "El correo electrónico ya está registrado por una empresa o usuario" });
+        }
+
+        // 1. Crear el Cliente (Empresa)
+        const nuevaEmpresa = new Cliente({
+            nombreEmpresa,
+            nombreContacto,
+            email: email.toLowerCase(),
+            telefono: telefono || ""
+        });
+        const empresaGuardada = await nuevaEmpresa.save();
+
+        // 2. Crear el Trabajador (Usuario Administrador de la Empresa)
+        const nuevoUsuario = new Trabajador({
+            nombre: nombreContacto,
+            email: email.toLowerCase(),
+            password,
+            empresa: empresaGuardada._id,
+            puesto: "Administrador de Empresa",
+            role: "cliente",
+            contraseñaTemporal: false
+        });
+        const usuarioGuardado = await nuevoUsuario.save();
+
+        // 3. Vincular el usuario administrador al cliente para tener relación bidireccional
+        empresaGuardada.usuarioAsociado = usuarioGuardado._id;
+        await empresaGuardada.save();
+
+        res.status(201).json({
+            message: "Empresa registrada con éxito. Ya puedes iniciar sesión.",
+            empresaId: empresaGuardada._id
+        });
+    } catch (error) {
+        console.error("❌ ERROR CRÍTICO EN REGISTRO DE EMPRESA:");
+        console.error(error);
+
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: "El correo electrónico o el nombre de la empresa ya están registrados",
+                details: error.keyValue
+            });
+        }
+
+        res.status(500).json({
+            message: "Error al registrar la empresa",
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
+
+// Login para trabajadores y empresas
 router.post("/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -183,8 +264,8 @@ router.post("/auth/login", async (req, res) => {
                 id: trabajador._id,
                 email: trabajador.email,
                 nombre: trabajador.nombre,
-                empresa: trabajador.empresa._id,
-                role: "trabajador",
+                empresa: trabajador.empresa?._id || null,
+                role: trabajador.role || "trabajador",
                 contraseñaTemporal: trabajador.contraseñaTemporal
             },
             JWT_SECRET,
@@ -199,6 +280,7 @@ router.post("/auth/login", async (req, res) => {
                 nombre: trabajador.nombre,
                 email: trabajador.email,
                 puesto: trabajador.puesto,
+                role: trabajador.role || "trabajador",
                 empresa: trabajador.empresa,
                 contraseñaTemporal: trabajador.contraseñaTemporal
             }

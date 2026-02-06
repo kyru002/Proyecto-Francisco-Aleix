@@ -9,6 +9,29 @@ const api = axios.create({
     },
 });
 
+// Interceptor para añadir el token JWT
+api.interceptors.request.use(config => {
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    if (user && user.token) {
+        config.headers.Authorization = `Bearer ${user.token}`;
+    }
+    return config;
+}, error => {
+    return Promise.reject(error);
+});
+
+// Interceptor de respuesta para manejar errores globales (401, etc.)
+api.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('currentUser');
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const ticketsService = {
     getAll: (params) => {
         const config = params ? { params } : {};
@@ -31,6 +54,7 @@ export const tecnicosService = {
 
 export const clientesService = {
     getAll: () => api.get('/clientes').then(res => res.data),
+    getById: (id) => api.get(`/clientes/${id}`).then(res => res.data),
     create: (data) => api.post('/clientes', data).then(res => res.data),
     update: (id, data) => api.put(`/clientes/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/clientes/${id}`).then(res => res.data),
@@ -43,6 +67,7 @@ export const trabajadoresService = {
     create: (data) => api.post('/trabajadores', data).then(res => res.data),
     update: (id, data) => api.put(`/trabajadores/${id}`, data).then(res => res.data),
     delete: (id) => api.delete(`/trabajadores/${id}`).then(res => res.data),
+    getEquipo: () => api.get('/trabajadores/equipo').then(res => res.data),
     cambiarPassword: (id, data) => api.patch(`/trabajadores/${id}/cambiar-password`, data).then(res => res.data),
     login: (email, password) => api.post('/trabajadores/auth/login', { email, password }).then(res => res.data),
 };

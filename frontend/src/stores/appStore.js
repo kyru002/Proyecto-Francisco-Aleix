@@ -20,20 +20,28 @@ export const useAppStore = defineStore('app', {
                 let albaranesPromise;
                 let tecnicosPromise;
                 let clientesPromise;
-                
-                if (this.currentUser?.role === 'cliente' && this.currentUser?.clienteId) {
-                    ticketsPromise = ticketsService.getAll({ clienteId: this.currentUser.clienteId });
-                    albaranesPromise = albaranesService.getAll({ cliente: this.currentUser.clienteId });
-                    // Los clientes no necesitan ver la lista de técnicos ni otros clientes
+
+                if (this.currentUser?.role === 'cliente') {
+                    // Coger el ID de empresa tanto si está en clienteId como en empresa
+                    const cid = this.currentUser.empresa?._id || this.currentUser.empresa || this.currentUser.clienteId;
+                    const cleanId = typeof cid === 'object' ? (cid._id || cid.id) : cid;
+
+                    console.log('Fetching for client ID:', cleanId);
+
+                    ticketsPromise = ticketsService.getAll({ clienteId: cleanId });
+                    albaranesPromise = albaranesService.getAll({ cliente: cleanId });
+
+                    // Cargar los datos de la empresa propia para que aparezca en el modal de tickets
+                    clientesPromise = cleanId ? clientesService.getById(cleanId).then(c => [c]).catch(() => []) : Promise.resolve([]);
+
                     tecnicosPromise = Promise.resolve([]);
-                    clientesPromise = Promise.resolve([]);
                 } else {
                     ticketsPromise = ticketsService.getAll();
                     albaranesPromise = albaranesService.getAll();
-                    tecnicosPromise = tecnicosService.getAll();
+                    tecnicosPromise = trabajadoresService.getEquipo();
                     clientesPromise = clientesService.getAll();
                 }
-                
+
                 // Ejecutar en paralelo pero capturar errores individualmente para no bloquear todo
                 const results = await Promise.allSettled([
                     ticketsPromise,
@@ -61,7 +69,11 @@ export const useAppStore = defineStore('app', {
             }
         },
         async createTicket(data) {
-            const newTicket = await ticketsService.create(data);
+            // Limpiar campos que puedan ser strings vacíos para evitar errores de casting en el backend
+            const cleanData = { ...data };
+            if (!cleanData.tecnico) delete cleanData.tecnico;
+
+            const newTicket = await ticketsService.create(cleanData);
             this.tickets.unshift(newTicket);
             return newTicket;
         },
@@ -90,19 +102,43 @@ export const useAppStore = defineStore('app', {
         async createTrabajador(data) {
             const nuevoTrabajador = await trabajadoresService.create(data);
             this.trabajadores.unshift(nuevoTrabajador);
+
+            // Si el nuevo trabajador no es cliente, añadirlo también a la lista de técnicos para asignación
+            if (nuevoTrabajador.role !== 'cliente') {
+                this.tecnicos.push(nuevoTrabajador);
+                this.tecnicos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+            }
+
             return nuevoTrabajador;
         },
         async updateTrabajador(id, data) {
             const updatedTrabajador = await trabajadoresService.update(id, data);
-            const index = this.trabajadores.findIndex(t => t._id === id);
-            if (index !== -1) {
-                this.trabajadores[index] = updatedTrabajador;
+
+            // Actualizar en la lista general de trabajadores
+            const tIndex = this.trabajadores.findIndex(t => t._id === id);
+            if (tIndex !== -1) this.trabajadores[tIndex] = updatedTrabajador;
+
+            // Actualizar en la lista de técnicos asignables
+            const techIndex = this.tecnicos.findIndex(t => t._id === id);
+            if (techIndex !== -1) {
+                if (updatedTrabajador.role === 'cliente') {
+                    // Si el rol cambió a cliente, quitar de técnicos
+                    this.tecnicos.splice(techIndex, 1);
+                } else {
+                    this.tecnicos[techIndex] = updatedTrabajador;
+                }
+            } else if (updatedTrabajador.role !== 'cliente') {
+                // Si antes no era técnico y ahora sí, añadirlo
+                this.tecnicos.push(updatedTrabajador);
             }
+
+            this.tecnicos.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
             return updatedTrabajador;
         },
         async deleteTrabajador(id) {
             await trabajadoresService.delete(id);
             this.trabajadores = this.trabajadores.filter(t => t._id !== id);
+            this.tecnicos = this.tecnicos.filter(t => t._id !== id);
         },
         async cambiarPasswordTrabajador(id, data) {
             return await trabajadoresService.cambiarPassword(id, data);
@@ -142,38 +178,38 @@ export const useAppStore = defineStore('app', {
             }
             return updatedTicket;
         },
-        async createAlbarani(data) {
-            const nuevoAlbarani = await albaranesService.create(data);
-            this.albaranes.unshift(nuevoAlbarani);
-            return nuevoAlbarani;
+        async createAlbaran(data) {
+            const nuevoAlbaran = await albaranesService.create(data);
+            this.albaranes.unshift(nuevoAlbaran);
+            return nuevoAlbaran;
         },
-        async updateAlbarani(id, data) {
-            const updatedAlbarani = await albaranesService.update(id, data);
+        async updateAlbaran(id, data) {
+            const updatedAlbaran = await albaranesService.update(id, data);
             const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
-                this.albaranes[index] = updatedAlbarani;
+                this.albaranes[index] = updatedAlbaran;
             }
-            return updatedAlbarani;
+            return updatedAlbaran;
         },
-        async deleteAlbarani(id) {
+        async deleteAlbaran(id) {
             await albaranesService.delete(id);
             this.albaranes = this.albaranes.filter(a => a._id !== id);
         },
-        async cambiarEstadoAlbarani(id, estado) {
-            const updatedAlbarani = await albaranesService.cambiarEstado(id, estado);
+        async cambiarEstadoAlbaran(id, estado) {
+            const updatedAlbaran = await albaranesService.cambiarEstado(id, estado);
             const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
-                this.albaranes[index] = updatedAlbarani;
+                this.albaranes[index] = updatedAlbaran;
             }
-            return updatedAlbarani;
+            return updatedAlbaran;
         },
-        async entregarAlbarani(id, firmante) {
-            const updatedAlbarani = await albaranesService.entregar(id, firmante);
+        async entregarAlbaran(id, firmante) {
+            const updatedAlbaran = await albaranesService.entregar(id, firmante);
             const index = this.albaranes.findIndex(a => a._id === id);
             if (index !== -1) {
-                this.albaranes[index] = updatedAlbarani;
+                this.albaranes[index] = updatedAlbaran;
             }
-            return updatedAlbarani;
+            return updatedAlbaran;
         },
         logout() {
             this.currentUser = null;

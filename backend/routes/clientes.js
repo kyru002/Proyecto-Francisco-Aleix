@@ -12,6 +12,19 @@ router.get("/", async (req, res) => {
     }
 });
 
+// Obtener un cliente por ID
+router.get("/:id", async (req, res) => {
+    try {
+        const cliente = await Cliente.findById(req.params.id);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+        res.json(cliente);
+    } catch (error) {
+        res.status(500).json({ msg: "Error al obtener el cliente", error: error.message });
+    }
+});
+
 // Crear un nuevo cliente
 router.post("/", async (req, res) => {
     try {
@@ -37,13 +50,26 @@ router.put("/:id", async (req, res) => {
     }
 });
 
-// Eliminar un cliente
+// Eliminar un cliente por completo (incluyendo sus trabajadores y tickets)
 router.delete("/:id", async (req, res) => {
     try {
-        await Cliente.findByIdAndDelete(req.params.id);
-        res.json({ msg: "Cliente eliminado" });
+        const clienteId = req.params.id;
+
+        // 1. Borrar todos los trabajadores asociados a la empresa
+        const Trabajador = require("../models/Trabajador");
+        await Trabajador.deleteMany({ empresa: clienteId });
+
+        // 2. Borrar todos los tickets asociados a la empresa
+        const Ticket = require("../models/Ticket");
+        await Ticket.deleteMany({ cliente: clienteId });
+
+        // 3. Borrar la empresa
+        await Cliente.findByIdAndDelete(clienteId);
+
+        res.json({ msg: "Empresa y todos sus datos asociados (trabajadores y tickets) han sido eliminados" });
     } catch (error) {
-        res.status(500).json({ msg: "Error al eliminar el cliente" });
+        console.error("Error al eliminar empresa completa:", error);
+        res.status(500).json({ msg: "Error al eliminar la empresa y sus datos", error: error.message });
     }
 });
 
@@ -86,7 +112,7 @@ router.post("/:id/contactos", async (req, res) => {
 
         cliente.contactos.push(nuevoContacto);
         const clienteActualizado = await cliente.save();
-        
+
         res.status(201).json(clienteActualizado);
     } catch (error) {
         res.status(500).json({ msg: "Error al crear contacto", error: error.message });
@@ -131,7 +157,7 @@ router.delete("/:id/contactos/:contactoId", async (req, res) => {
 
         cliente.contactos.id(req.params.contactoId).deleteOne();
         const clienteActualizado = await cliente.save();
-        
+
         res.json(clienteActualizado);
     } catch (error) {
         res.status(500).json({ msg: "Error al eliminar contacto", error: error.message });

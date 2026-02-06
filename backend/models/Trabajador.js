@@ -20,10 +20,15 @@ const TrabajadorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  role: {
+    type: String,
+    enum: ["admin", "trabajador", "cliente"],
+    default: "trabajador",
+  },
   empresa: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Cliente",
-    required: true,
+    required: false, // Opcional para Admin global o durante proceso de registro
   },
   password: {
     type: String,
@@ -31,7 +36,7 @@ const TrabajadorSchema = new mongoose.Schema({
   },
   contraseñaTemporal: {
     type: Boolean,
-    default: true, // Cuando se crea, es temporal y debe cambiarla al primer login
+    default: false, // Cambiamos a false por defecto para registros nuevos
   },
   estado: {
     type: String,
@@ -49,18 +54,13 @@ const TrabajadorSchema = new mongoose.Schema({
 });
 
 // Hash de contraseña antes de guardar
-TrabajadorSchema.pre("save", async function (next) {
+TrabajadorSchema.pre("save", async function () {
   if (!this.isModified("password")) {
-    return next();
+    return;
   }
 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Método para comparar contraseñas
@@ -80,4 +80,4 @@ function generarContraseñaTemporal() {
 
 TrabajadorSchema.statics.generarContraseñaTemporal = generarContraseñaTemporal;
 
-module.exports = mongoose.model("Trabajador", TrabajadorSchema);
+module.exports = mongoose.model("Trabajador", TrabajadorSchema, "trabajadores");

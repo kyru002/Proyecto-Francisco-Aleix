@@ -11,7 +11,8 @@ import {
   Clock,
   ExternalLink,
   FileText,
-  CheckCircle
+  CheckCircle,
+  UserPlus
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -25,6 +26,18 @@ const newTicket = ref({
   tecnico: ''
 });
 
+const openCreateModal = () => {
+  if (store.currentUser?.role === 'cliente') {
+    // Intentar obtener el ID del cliente de clienteId o empresa
+    const clienteData = store.currentUser.clienteId || store.currentUser.empresa;
+    // Si es un objeto (porque viene poblado del backend), coger el _id
+    newTicket.value.cliente = typeof clienteData === 'object' ? (clienteData._id || clienteData.id) : clienteData;
+  } else {
+    newTicket.value.cliente = '';
+  }
+  showCreateModal.value = true;
+};
+
 onMounted(async () => {
   await store.fetchAll();
 });
@@ -34,35 +47,65 @@ const showEditModal = ref(false);
 const searchQuery = ref('');
 const filterStatus = ref('');
 const filterPriority = ref('');
+const filterCliente = ref('');
+
+const clearFilters = () => {
+  searchQuery.value = '';
+  filterStatus.value = '';
+  filterPriority.value = '';
+  filterCliente.value = '';
+};
 
 // Computed property para filtrar tickets
 const filteredTickets = computed(() => {
   let tickets = store.tickets;
 
+  // Si es cliente, solo ver tickets de su empresa (redundante pero seguro)
+  if (store.currentUser?.role === 'cliente') {
+    const userEmpresaId = String(store.currentUser.empresa?._id || store.currentUser.empresa || '');
+    if (userEmpresaId) {
+      tickets = tickets.filter(t => {
+        const ticketEmpresaId = String(t.cliente?._id || t.cliente || '');
+        return ticketEmpresaId === userEmpresaId;
+      });
+    }
+  }
+
+  // Filtro por cliente (Admin/Trabajador)
+  if (filterCliente.value && store.currentUser?.role !== 'cliente') {
+    tickets = tickets.filter(t => String(t.cliente?._id || t.cliente || '') === filterCliente.value);
+  }
+
   // Filtro por búsqueda de texto
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase().trim();
     tickets = tickets.filter(ticket => {
-      const title = ticket.title?.toLowerCase() || '';
-      const id = ticket._id?.toLowerCase() || '';
+      const title = String(ticket.title || '').toLowerCase();
+      const id = String(ticket._id || '').toLowerCase();
       const clientName = ticket.cliente?.nombreEmpresa?.toLowerCase() || '';
       const clientContact = ticket.cliente?.nombreContacto?.toLowerCase() || '';
+      const techName = ticket.tecnico?.nombre?.toLowerCase() || '';
+      const description = String(ticket.description || '').toLowerCase();
       
       return title.includes(query) || 
              id.includes(query) || 
              clientName.includes(query) ||
-             clientContact.includes(query);
+             clientContact.includes(query) ||
+             techName.includes(query) ||
+             description.includes(query);
     });
   }
 
-  // Filtro por estado
+  // Filtro por estado (Insensible a mayúsculas)
   if (filterStatus.value) {
-    tickets = tickets.filter(ticket => ticket.status === filterStatus.value);
+    const s = filterStatus.value.toLowerCase();
+    tickets = tickets.filter(ticket => String(ticket.status || '').toLowerCase() === s);
   }
 
-  // Filtro por prioridad
+  // Filtro por prioridad (Insensible a mayúsculas)
   if (filterPriority.value) {
-    tickets = tickets.filter(ticket => ticket.priority === filterPriority.value);
+    const p = filterPriority.value.toLowerCase();
+    tickets = tickets.filter(ticket => String(ticket.priority || '').toLowerCase() === p);
   }
 
   return tickets;
@@ -77,7 +120,8 @@ const handleCreateTicket = async () => {
     await store.fetchAll();
   } catch (error) {
     console.error('Error al crear ticket:', error);
-    alert('Error al crear el ticket');
+    const msg = error.response?.data?.error || error.response?.data?.msg || error.message || 'Error desconocido';
+    alert(`Error al crear el ticket: ${msg}`);
   }
 };
 
@@ -127,6 +171,32 @@ const handleMarkAsCompleted = async (ticket) => {
     }
   }
 };
+const showAssignModal = ref(false);
+const quickAssignTech = ref('');
+const ticketToAssign = ref(null);
+const confirmUnassign = ref(true); // Permitir siempre desasignar si se elige "Sin asignar"
+
+const handleQuickAssign = (ticket) => {
+  ticketToAssign.value = ticket;
+  quickAssignTech.value = ticket.tecnico?._id || ticket.tecnico || '';
+  showAssignModal.value = true;
+};
+
+const saveQuickAssign = async () => {
+  if (!ticketToAssign.value) return;
+  
+  try {
+    await store.updateTicket(ticketToAssign.value._id, {
+      ...ticketToAssign.value,
+      tecnico: quickAssignTech.value || null
+    });
+    showAssignModal.value = false;
+    alert('Asignación actualizada con éxito');
+    await store.fetchAll();
+  } catch (error) {
+    alert('Error al actualizar la asignación');
+  }
+};
 </script>
 
 <template>
@@ -136,7 +206,7 @@ const handleMarkAsCompleted = async (ticket) => {
         <h1 class="page-title">Tickets de Soporte</h1>
         <p class="page-subtitle">Gestiona y responde a las solicitudes de ayuda</p>
       </div>
-      <button v-if="store.currentUser?.role !== 'cliente'" @click="showCreateModal = true" class="btn btn-primary">
+      <button v-if="store.currentUser?.role !== 'trabajador'" @click="openCreateModal" class="btn btn-primary">
         <Plus />
         Nuevo Ticket
       </button>
@@ -144,34 +214,39 @@ const handleMarkAsCompleted = async (ticket) => {
 
     <!-- Barra de Filtros -->
     <div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
-      <div class="filters-bar">
-        <div class="input-with-icon" style="flex: 1;">
+      <div class="filters-bar" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <div class="input-with-icon" style="flex: 2; min-width: 250px;">
           <Search />
-          <input v-model="searchQuery" type="text" class="form-input" placeholder="Buscar por título, ID o cliente...">
+          <input v-model="searchQuery" type="text" class="form-input" placeholder="Buscar por título, ID, técnico o contenido...">
         </div>
-        <select v-model="filterStatus" class="form-input form-select">
+        
+        <!-- Filtro por Cliente (Solo para Admin/Trabajador) -->
+        <select v-if="store.currentUser?.role !== 'cliente'" v-model="filterCliente" class="form-input form-select" style="flex: 1; min-width: 150px;">
+          <option value="">Todos los clientes</option>
+          <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa }}</option>
+        </select>
+
+        <select v-model="filterStatus" class="form-input form-select" style="flex: 1; min-width: 140px;">
           <option value="">Todos los estados</option>
           <option value="abierto">Abierto</option>
           <option value="en progreso">En Progreso</option>
           <option value="cerrado">Cerrado</option>
         </select>
-        <select v-model="filterPriority" class="form-input form-select">
+
+        <select v-model="filterPriority" class="form-input form-select" style="flex: 1; min-width: 140px;">
           <option value="">Cualquier prioridad</option>
           <option value="alta">Alta</option>
           <option value="media">Media</option>
           <option value="baja">Baja</option>
         </select>
+
+        <button @click="clearFilters" class="btn btn-ghost" style="padding: 0.5rem;" title="Limpiar filtros">
+          <Filter style="width: 18px; height: 18px;" />
+          Limpiar
+        </button>
       </div>
     </div>
 
-    <!-- Lista de Tickets -->
-    <div v-if="filteredTickets.length === 0" class="empty-state">
-      <FileText style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
-      <p v-if="store.tickets.length === 0">No hay tickets creados aún.</p>
-      <p v-else>No se encontraron tickets con los filtros actuales.</p>
-    </div>
-
-    <!-- Lista de Tickets -->
     <div v-if="filteredTickets.length === 0" class="empty-state">
       <FileText style="width: 48px; height: 48px; opacity: 0.2; margin-bottom: 1rem;" />
       <p v-if="store.tickets.length === 0">No hay tickets creados aún.</p>
@@ -202,6 +277,12 @@ const handleMarkAsCompleted = async (ticket) => {
             <span v-if="ticket.endDate" style="margin-left: 0.5rem; color: var(--success);">
               • Finalizado: {{ new Date(ticket.endDate).toLocaleDateString() }}
             </span>
+            <span v-if="ticket.tecnico" style="margin-left: 0.5rem; color: var(--primary); font-weight: 500;">
+              • Técnico: {{ ticket.tecnico.nombre || 'Asignado' }}
+            </span>
+            <span v-else-if="store.currentUser?.role !== 'cliente'" style="margin-left: 0.5rem; color: var(--destructive); font-style: italic;">
+              • Sin técnico asignado
+            </span>
           </div>
         </div>
 
@@ -229,6 +310,14 @@ const handleMarkAsCompleted = async (ticket) => {
             >
               <CheckCircle style="width: 14px; height: 14px;" />
             </button>
+            <button 
+              v-if="store.currentUser?.role !== 'cliente'" 
+              @click="handleQuickAssign(ticket)" 
+              class="btn btn-secondary btn-icon" 
+              title="Asignar trabajador"
+            >
+              <UserPlus style="width: 14px; height: 14px;" />
+            </button>
             <button @click="handleEditTicket(ticket)" class="btn btn-secondary btn-icon" title="Editar">
               <MessageSquare style="width: 14px; height: 14px;" />
             </button>
@@ -236,6 +325,30 @@ const handleMarkAsCompleted = async (ticket) => {
               <ExternalLink />
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Asignación Rápida -->
+    <div v-if="showAssignModal" class="modal-overlay">
+      <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Asignar Trabajador</h2>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Selecciona quién se encargará de este ticket:</label>
+            <select v-model="quickAssignTech" class="form-input form-select">
+              <option value="">Sin asignar</option>
+              <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre }} ({{ t.puesto }})</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showAssignModal = false" class="btn btn-secondary">Cancelar</button>
+          <button @click="saveQuickAssign" class="btn btn-primary" :disabled="!quickAssignTech && !confirmUnassign">
+            Guardar Asignación
+          </button>
         </div>
       </div>
     </div>
@@ -256,7 +369,7 @@ const handleMarkAsCompleted = async (ticket) => {
               <label class="form-label">Cliente / Empresa</label>
               <select v-model="editingTicket.cliente" class="form-input form-select" required>
                 <option value="" disabled>Seleccionar cliente</option>
-                <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa || c.company }} ({{ c.nombreContacto || c.name }})</option>
+                <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa }} ({{ c.nombreContacto }})</option>
               </select>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -277,11 +390,11 @@ const handleMarkAsCompleted = async (ticket) => {
                 </select>
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" v-if="store.currentUser?.role !== 'cliente'">
               <label class="form-label">Asignar a Técnico</label>
               <select v-model="editingTicket.tecnico" class="form-input form-select">
                 <option value="">Sin asignar</option>
-                <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre || t.name }}</option>
+                <option v-for="t in store.tecnicos" :key="t._id" :value="t._id">{{ t.nombre }}</option>
               </select>
             </div>
             <div class="form-group">
@@ -309,12 +422,25 @@ const handleMarkAsCompleted = async (ticket) => {
               <label class="form-label">Título del Problema</label>
               <input v-model="newTicket.title" type="text" class="form-input" required placeholder="Ej: No puedo acceder al correo">
             </div>
-            <div class="form-group">
+            <div class="form-group" v-if="store.currentUser?.role !== 'cliente'">
               <label class="form-label">Cliente / Empresa</label>
               <select v-model="newTicket.cliente" class="form-input form-select" required>
                 <option value="" disabled>Seleccionar cliente</option>
                 <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa }} ({{ c.nombreContacto }})</option>
               </select>
+            </div>
+            <!-- Si es cliente, mostrar su empresa pero no dejar cambiarla si no tiene permiso -->
+            <div class="form-group" v-else>
+              <label class="form-label">Empresa Asociada</label>
+              <select v-model="newTicket.cliente" class="form-input form-select" disabled>
+                <option v-for="c in store.clientes" :key="c._id" :value="c._id">{{ c.nombreEmpresa || c.company || 'Cargando empresa...' }}</option>
+              </select>
+              <p v-if="store.clientes.length === 0" style="font-size: 0.75rem; color: var(--destructive); margin-top: 0.25rem;">
+                ⚠️ No se han podido cargar tus datos de empresa.
+              </p>
+              <p v-else style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.25rem;">
+                Tu ticket se asociará automáticamente a la empresa indicada.
+              </p>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
@@ -325,7 +451,7 @@ const handleMarkAsCompleted = async (ticket) => {
                   <option value="alta">Alta</option>
                 </select>
               </div>
-              <div class="form-group">
+              <div class="form-group" v-if="store.currentUser?.role !== 'cliente'">
                 <label class="form-label">Asignar a Técnico</label>
                 <select v-model="newTicket.tecnico" class="form-input form-select">
                   <option value="">Sin asignar</option>

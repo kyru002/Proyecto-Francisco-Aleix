@@ -10,6 +10,7 @@ import Login from '../views/Login.vue';
 const routes = [
     { path: '/', redirect: '/dashboard' },
     { path: '/login', name: 'Login', component: Login },
+    { path: '/register', name: 'Register', component: () => import('../views/Register.vue') },
     { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
     { path: '/tickets', name: 'Tickets', component: Tickets, meta: { requiresAuth: true } },
     { path: '/tickets/:id', name: 'TicketDetail', component: TicketDetail, meta: { requiresAuth: true } },
@@ -25,8 +26,15 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
     if (to.meta.requiresAuth && !currentUser) {
         next('/login');
+    } else if (to.path === '/' && currentUser) {
+        if (currentUser.role === 'admin') {
+            next('/dashboard');
+        } else {
+            next('/tickets');
+        }
     } else {
         next();
     }
