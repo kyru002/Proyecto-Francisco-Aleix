@@ -49,7 +49,7 @@ const TicketSchema = new mongoose.Schema({
             },
             role: {
                 type: String,
-                enum: ["cliente", "tecnico", "trabajador", "admin"],
+                enum: ["cliente", "tecnico", "admin"],
                 required: true
             },
             content: {

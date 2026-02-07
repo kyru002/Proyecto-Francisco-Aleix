@@ -4,6 +4,7 @@ const cors = require("cors");
 const connectDB = require("./database");
 const { Server } = require("socket.io");
 const http = require("http");
+const auth = require("./middleware/auth");
 const CallLog = require("./models/CallLog");
 
 // Crear servidor HTTP para Socket.io
@@ -28,6 +29,7 @@ app.use("/api/clientes", require("./routes/clientes"));
 app.use("/api/albaranes", require("./routes/albaranes"));
 app.use("/api/callLogs", require("./routes/callLogs"));
 app.use("/api/trabajadores", require("./routes/trabajadores"));
+app.use("/api/ai", auth, require("./routes/ai"));
 
 // Ruta inicial
 app.get("/", (req, res) => {
@@ -50,13 +52,17 @@ io.on("connection", (socket) => {
     return originalOn(event, ...args);
   };
 
+  // Manejar mensajes de chat en tiempo real
+  socket.on("chat-message", (data) => {
+    const { ticketId, message } = data;
+    const room = `ticket-${ticketId}`;
+    console.log(`💬 Nuevo mensaje en sala ${room}:`, message.content);
+
+    // Retransmitir a todos en la sala EXCEPTO al que lo envió (él ya lo ve localmente)
+    socket.broadcast.to(room).emit("new-chat-message", message);
+  });
+
   // DEBUG: Log de todos los eventos emitidos al socket
-  socket.onevent = (packet) => {
-    const args = packet.data || [];
-    const eventName = args[0];
-    console.log(`📨 SOCKET EMITIÓ EVENTO: "${eventName}"`, args.slice(1));
-    socket.__proto__.onevent.call(socket, packet);
-  };
 
   // Unirse a sala de ticket
   socket.on("join-ticket-room", (ticketId, userData) => {

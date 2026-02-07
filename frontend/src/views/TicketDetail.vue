@@ -65,6 +65,7 @@ const callStartTime = ref(null);
 const callDuration = ref(0);
 const callTimerInterval = ref(null);
 
+
 // Función para asignar refs de video remoto - DEPRECATED, usar ref directo
 const setRemoteVideoRef = (el) => {
   if (el) {
@@ -126,7 +127,7 @@ onUnmounted(() => {
 
 const initializeSocket = (ticketId) => {
   console.log('🔌 Inicializando Socket.io...');
-  socket.value = io('http://localhost:5001', {
+  socket.value = io('/', {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 5
@@ -244,6 +245,19 @@ const initializeSocket = (ticketId) => {
     }
   });
 
+  // Recibir nuevo mensaje de chat en tiempo real
+  socket.value.on('new-chat-message', (message) => {
+    console.log('💬 Nuevo mensaje recibido por socket:', message);
+    if (!messages.value.some(m => m._id === message._id)) {
+      messages.value.push(message);
+      // Hacer scroll al final
+      nextTick(() => {
+        const container = document.querySelector('.card-content');
+        if (container) container.scrollTop = container.scrollHeight;
+      });
+    }
+  });
+
   // Usuario desconectado
   socket.value.on('user-disconnected', (data) => {
     if (data.userId === remoteUserId.value) {
@@ -251,6 +265,45 @@ const initializeSocket = (ticketId) => {
     }
   });
 };
+
+const handleSendMessage = async () => {
+  if (!newMessage.value.trim()) return;
+
+  const messageData = {
+    author: store.currentUser?.nombre || store.currentUser?.name || "Usuario",
+    role: store.currentUser?.role || "cliente",
+    content: newMessage.value.trim()
+  };
+
+  try {
+    const ticketId = route.params.id;
+    const updatedTicket = await store.sendTicketMessage(ticketId, messageData);
+    
+    if (updatedTicket) {
+      const lastMessage = updatedTicket.messages[updatedTicket.messages.length - 1];
+      
+      // Emitir por socket para que el otro usuario lo reciba al instante
+      if (socket.value) {
+        socket.value.emit("chat-message", {
+          ticketId: ticketId,
+          message: lastMessage
+        });
+      }
+
+      messages.value.push(lastMessage);
+      newMessage.value = '';
+      
+      nextTick(() => {
+        const container = document.querySelector('.card-content');
+        if (container) container.scrollTop = container.scrollHeight;
+      });
+    }
+  } catch (err) {
+    console.error("Error al enviar mensaje:", err);
+    alert("Error al enviar mensaje");
+  }
+};
+
 
 const startCall = async (type) => {
   try {
@@ -850,34 +903,6 @@ const endCall = () => {
   callDuration.value = 0;
 };
 
-const handleSendMessage = async () => {
-  if (!newMessage.value.trim()) {
-    alert('Por favor, escribe un mensaje');
-    return;
-  }
-
-  try {
-    const messageData = {
-      author: store.currentUser?.name || 'Usuario Anónimo',
-      role: store.currentUser?.role || 'admin',
-      content: newMessage.value
-    };
-
-    const updatedTicket = await store.sendTicketMessage(route.params.id, messageData);
-    messages.value = updatedTicket.messages || [];
-    newMessage.value = '';
-    
-    // Scroll al último mensaje
-    setTimeout(() => {
-      const messagesContainer = document.querySelector('[style*="overflow-y"]');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
-    }, 0);
-  } catch (err) {
-    alert('Error al enviar mensaje: ' + err.message);
-  }
-};
 
 const handleChangeStatus = async (newStatus) => {
   try {
@@ -1336,7 +1361,8 @@ const formatDate = (date) => {
         </div>
 
         <!-- Input de Mensaje -->
-        <div class="card-footer" style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: auto;">
+        <div class="card-footer" style="border-top: 1px solid var(--border); padding: 1rem; margin-top: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+
           <form @submit.prevent="handleSendMessage" style="display: flex; gap: 0.75rem;">
             <input
               v-model="newMessage"
@@ -1355,6 +1381,12 @@ const formatDate = (date) => {
     </div>
   </div>
 </template>
+
+<style>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 
 <style scoped>
 .ticket-details-collapsible {

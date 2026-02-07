@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
+import { trabajadoresService } from '../services/api';
 import { Building2, User, Mail, Lock, Phone, ArrowLeft, Loader2 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -23,17 +24,7 @@ const handleRegister = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const response = await fetch('http://localhost:5001/api/trabajadores/auth/register-empresa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Error al registrar la empresa');
-    }
+    await trabajadoresService.registerEmpresa(form.value);
     
     success.value = true;
     setTimeout(() => {

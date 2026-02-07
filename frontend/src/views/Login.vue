@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
+import { trabajadoresService } from '../services/api';
 import { Ticket, Mail, Lock, AlertCircle } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -14,17 +15,7 @@ const error = ref('');
 const handleLogin = async () => {
   error.value = '';
   try {
-    const response = await fetch('http://localhost:5001/api/trabajadores/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value, password: password.value })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Error en autenticación');
-    }
+    const data = await trabajadoresService.login(email.value, password.value);
     
     store.login({
       id: data.trabajador._id,
@@ -50,7 +41,7 @@ const handleLogin = async () => {
           <Ticket />
         </div>
         <h1 class="login-title">SupportDesk</h1>
-        <p class="login-description">Loguéate si eres una empresa o trabajador</p>
+        <p class="login-description">Loguéate si eres una empresa o técnico</p>
       </div>
 
       <div class="login-body">

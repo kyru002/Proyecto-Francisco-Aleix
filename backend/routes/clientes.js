@@ -1,9 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const Cliente = require("../models/Cliente");
+const auth = require("../middleware/auth");
+const checkRole = require("../middleware/checkRole");
 
-// Obtener todos los clientes
-router.get("/", async (req, res) => {
+// Obtener todos los clientes (Solo Admin y Técnico)
+router.get("/", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const clientes = await Cliente.find().sort({ createdAt: -1 });
         res.json(clientes);
@@ -12,9 +14,14 @@ router.get("/", async (req, res) => {
     }
 });
 
-// Obtener un cliente por ID
-router.get("/:id", async (req, res) => {
+// Obtener un cliente por ID (Protegido)
+router.get("/:id", auth, async (req, res) => {
     try {
+        // Control de acceso: Clientes solo pueden ver su propia empresa
+        if (req.user.role === 'cliente' && req.user.empresa.toString() !== req.params.id) {
+            return res.status(403).json({ msg: "No tienes permiso para ver esta empresa" });
+        }
+
         const cliente = await Cliente.findById(req.params.id);
         if (!cliente) {
             return res.status(404).json({ msg: "Cliente no encontrado" });
@@ -25,8 +32,8 @@ router.get("/:id", async (req, res) => {
     }
 });
 
-// Crear un nuevo cliente
-router.post("/", async (req, res) => {
+// Crear un nuevo cliente (SOLO ADMIN)
+router.post("/", auth, checkRole(['admin']), async (req, res) => {
     try {
         const newCliente = new Cliente(req.body);
         const savedCliente = await newCliente.save();
@@ -36,8 +43,8 @@ router.post("/", async (req, res) => {
     }
 });
 
-// Actualizar un cliente
-router.put("/:id", async (req, res) => {
+// Actualizar un cliente (SOLO ADMIN)
+router.put("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
         const updatedCliente = await Cliente.findByIdAndUpdate(
             req.params.id,
@@ -50,8 +57,8 @@ router.put("/:id", async (req, res) => {
     }
 });
 
-// Eliminar un cliente por completo (incluyendo sus trabajadores y tickets)
-router.delete("/:id", async (req, res) => {
+// Eliminar un cliente por completo (SOLO ADMIN)
+router.delete("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
         const clienteId = req.params.id;
 
@@ -75,9 +82,14 @@ router.delete("/:id", async (req, res) => {
 
 // ========== ENDPOINTS PARA CONTACTOS ==========
 
-// Obtener contactos de un cliente
-router.get("/:id/contactos", async (req, res) => {
+// Obtener contactos de un cliente (Protegido)
+router.get("/:id/contactos", auth, async (req, res) => {
     try {
+        // Control de acceso para clientes
+        if (req.user.role === 'cliente' && req.user.empresa.toString() !== req.params.id) {
+            return res.status(403).json({ msg: "No tienes acceso a los contactos de esta empresa" });
+        }
+
         const cliente = await Cliente.findById(req.params.id);
         if (!cliente) {
             return res.status(404).json({ msg: "Cliente no encontrado" });
@@ -88,8 +100,8 @@ router.get("/:id/contactos", async (req, res) => {
     }
 });
 
-// Crear un nuevo contacto en un cliente
-router.post("/:id/contactos", async (req, res) => {
+// Crear un nuevo contacto en un cliente (Admin o Técnico)
+router.post("/:id/contactos", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const cliente = await Cliente.findById(req.params.id);
         if (!cliente) {
@@ -119,8 +131,8 @@ router.post("/:id/contactos", async (req, res) => {
     }
 });
 
-// Actualizar un contacto
-router.put("/:id/contactos/:contactoId", async (req, res) => {
+// Actualizar un contacto (Admin o Técnico)
+router.put("/:id/contactos/:contactoId", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const cliente = await Cliente.findById(req.params.id);
         if (!cliente) {
@@ -147,8 +159,8 @@ router.put("/:id/contactos/:contactoId", async (req, res) => {
     }
 });
 
-// Eliminar un contacto
-router.delete("/:id/contactos/:contactoId", async (req, res) => {
+// Eliminar un contacto (Admin o Técnico)
+router.delete("/:id/contactos/:contactoId", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const cliente = await Cliente.findById(req.params.id);
         if (!cliente) {

@@ -206,7 +206,7 @@ const saveQuickAssign = async () => {
         <h1 class="page-title">Tickets de Soporte</h1>
         <p class="page-subtitle">Gestiona y responde a las solicitudes de ayuda</p>
       </div>
-      <button v-if="store.currentUser?.role !== 'trabajador'" @click="openCreateModal" class="btn btn-primary">
+      <button v-if="store.currentUser?.role !== 'tecnico'" @click="openCreateModal" class="btn btn-primary">
         <Plus />
         Nuevo Ticket
       </button>
@@ -314,7 +314,7 @@ const saveQuickAssign = async () => {
               v-if="store.currentUser?.role !== 'cliente'" 
               @click="handleQuickAssign(ticket)" 
               class="btn btn-secondary btn-icon" 
-              title="Asignar trabajador"
+              title="Asignar técnico"
             >
               <UserPlus style="width: 14px; height: 14px;" />
             </button>

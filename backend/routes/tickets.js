@@ -1,19 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const Ticket = require("../models/Ticket");
+const auth = require("../middleware/auth");
+const checkRole = require("../middleware/checkRole");
 
-// Obtener todos los tickets
-router.get("/", async (req, res) => {
+// Obtener todos los tickets (Protegido)
+router.get("/", auth, async (req, res) => {
     try {
-        const { clienteId } = req.query;
-
-        // Construir filtro
         const filter = {};
 
-        // Si no es admin/trabajador, forzar filtro por su propia empresa
-        // Nota: En un entorno real esto debería venir del token decodificado
-        if (clienteId && clienteId !== 'undefined' && clienteId !== 'null') {
-            filter.cliente = clienteId;
+        // Control de Acceso: Si es cliente, solo ve sus propios tickets
+        if (req.user.role === 'cliente') {
+            filter.cliente = req.user.empresa;
+        } else {
+            // Admin y técnicos pueden filtrar por cliente si lo desean
+            const { clienteId } = req.query;
+            if (clienteId && clienteId !== 'undefined' && clienteId !== 'null') {
+                filter.cliente = clienteId;
+            }
         }
 
         const tickets = await Ticket.find(filter)
@@ -27,10 +31,17 @@ router.get("/", async (req, res) => {
     }
 });
 
-// Crear un nuevo ticket
-router.post("/", async (req, res) => {
+// Crear un nuevo ticket (Protegido)
+router.post("/", auth, async (req, res) => {
     try {
-        const newTicket = new Ticket(req.body);
+        const ticketData = { ...req.body };
+
+        // Si es cliente, forzar que el ticket sea de su empresa
+        if (req.user.role === 'cliente') {
+            ticketData.cliente = req.user.empresa;
+        }
+
+        const newTicket = new Ticket(ticketData);
         const savedTicket = await newTicket.save();
         res.json(savedTicket);
     } catch (error) {
@@ -38,21 +49,27 @@ router.post("/", async (req, res) => {
     }
 });
 
-// Obtener mensajes de un ticket (DEBE estar antes de /:id)
-router.get("/:id/messages", async (req, res) => {
+// Obtener mensajes de un ticket (Protegido)
+router.get("/:id/messages", auth, async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ msg: "Ticket no encontrado" });
         }
+
+        // Control de Acceso (Privacidad)
+        if (req.user.role === 'cliente' && ticket.cliente.toString() !== req.user.empresa.toString()) {
+            return res.status(403).json({ msg: "No tienes permiso para ver este ticket" });
+        }
+
         res.json(ticket.messages || []);
     } catch (error) {
         res.status(500).json({ msg: "Error al obtener mensajes", error: error.message });
     }
 });
 
-// Enviar mensaje en un ticket (DEBE estar antes de /:id)
-router.post("/:id/messages", async (req, res) => {
+// Enviar mensaje en un ticket (Protegido)
+router.post("/:id/messages", auth, async (req, res) => {
     try {
         const { author, role, content } = req.body;
 
@@ -63,6 +80,11 @@ router.post("/:id/messages", async (req, res) => {
         const ticket = await Ticket.findById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ msg: "Ticket no encontrado" });
+        }
+
+        // Control de Acceso (Privacidad)
+        if (req.user.role === 'cliente' && ticket.cliente.toString() !== req.user.empresa.toString()) {
+            return res.status(403).json({ msg: "No tienes permiso para comentar en este ticket" });
         }
 
         ticket.messages.push({
@@ -79,8 +101,8 @@ router.post("/:id/messages", async (req, res) => {
     }
 });
 
-// Obtener un ticket por ID (DEBE estar después de rutas específicas)
-router.get("/:id", async (req, res) => {
+// Obtener un ticket por ID (Protegido)
+router.get("/:id", auth, async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id)
             .populate('cliente')
@@ -88,15 +110,32 @@ router.get("/:id", async (req, res) => {
         if (!ticket) {
             return res.status(404).json({ msg: "Ticket no encontrado" });
         }
+
+        // Control de Acceso (Privacidad)
+        if (req.user.role === 'cliente' && ticket.cliente._id.toString() !== req.user.empresa.toString()) {
+            return res.status(403).json({ msg: "No tienes permiso para ver este ticket" });
+        }
+
         res.json(ticket);
     } catch (error) {
         res.status(500).json({ msg: "Error al obtener el ticket", error: error.message });
     }
 });
 
-// Actualizar un ticket
-router.put("/:id", async (req, res) => {
+// Actualizar un ticket (Protegido)
+router.put("/:id", auth, async (req, res) => {
     try {
+        // Buscar primero para validar permisos
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ msg: "Ticket no encontrado" });
+
+        // Clientes solo pueden editar sus propios tickets y NO pueden cambiar todo (ej: tecnico asignado)
+        if (req.user.role === 'cliente') {
+            if (ticket.cliente.toString() !== req.user.empresa.toString()) {
+                return res.status(403).json({ msg: "No tienes permiso para modificar este ticket" });
+            }
+        }
+
         const updatedTicket = await Ticket.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -110,11 +149,11 @@ router.put("/:id", async (req, res) => {
     }
 });
 
-// Eliminar un ticket
-router.delete("/:id", async (req, res) => {
+// Eliminar un ticket (SOLO ADMIN)
+router.delete("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
         await Ticket.findByIdAndDelete(req.params.id);
-        res.json({ msg: "Ticket eliminado" });
+        res.json({ msg: "Ticket eliminado correctamente" });
     } catch (error) {
         res.status(500).json({ msg: "Error al eliminar el ticket" });
     }

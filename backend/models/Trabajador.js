@@ -22,8 +22,8 @@ const TrabajadorSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["admin", "trabajador", "cliente"],
-    default: "trabajador",
+    enum: ["admin", "tecnico", "cliente"],
+    default: "tecnico",
   },
   empresa: {
     type: mongoose.Schema.Types.ObjectId,

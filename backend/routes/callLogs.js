@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const CallLog = require("../models/CallLog");
+const auth = require("../middleware/auth");
+const Ticket = require("../models/Ticket");
+const checkRole = require("../middleware/checkRole");
 
-// Crear nuevo registro de llamada
-router.post("/", async (req, res) => {
+// Crear nuevo registro de llamada (Protegido)
+router.post("/", auth, async (req, res) => {
   try {
     const { callerSocketId, callerName, receiverSocketId, receiverName, ticket, callType, status } = req.body;
 
@@ -29,8 +32,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Actualizar registro de llamada (para terminar)
-router.patch("/:id", async (req, res) => {
+// Actualizar registro de llamada (Protegido)
+router.patch("/:id", auth, async (req, res) => {
   try {
     const { status, duration, screenShared, endTime } = req.body;
 
@@ -56,10 +59,20 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// Obtener registros de llamadas por ticket
-router.get("/ticket/:ticketId", async (req, res) => {
+// Obtener registros de llamadas por ticket (Protegido)
+router.get("/ticket/:ticketId", auth, async (req, res) => {
   try {
-    const callLogs = await CallLog.find({ ticket: req.params.ticketId })
+    const ticketId = req.params.ticketId;
+    const ticketDoc = await Ticket.findById(ticketId);
+
+    if (!ticketDoc) return res.status(404).json({ message: "Ticket no encontrado" });
+
+    // Control de acceso
+    if (req.user.role === 'cliente' && ticketDoc.cliente.toString() !== req.user.empresa.toString()) {
+      return res.status(403).json({ message: "No tienes permiso para ver los logs de este ticket" });
+    }
+
+    const callLogs = await CallLog.find({ ticket: ticketId })
       .populate("ticket")
       .sort({ startTime: -1 });
 
@@ -69,8 +82,8 @@ router.get("/ticket/:ticketId", async (req, res) => {
   }
 });
 
-// Obtener todos los registros de llamadas
-router.get("/", async (req, res) => {
+// Obtener todos los registros de llamadas (Admin/Técnico)
+router.get("/", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
   try {
     const callLogs = await CallLog.find()
       .populate("ticket")
@@ -82,13 +95,20 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Obtener un registro específico
-router.get("/:id", async (req, res) => {
+// Obtener un registro específico (Protegido)
+router.get("/:id", auth, async (req, res) => {
   try {
     const callLog = await CallLog.findById(req.params.id).populate("ticket");
 
     if (!callLog) {
       return res.status(404).json({ message: "Registro de llamada no encontrado" });
+    }
+
+    // Control de acceso si está vinculado a un ticket
+    if (callLog.ticket && req.user.role === 'cliente') {
+      if (callLog.ticket.cliente.toString() !== req.user.empresa.toString()) {
+        return res.status(403).json({ message: "No tienes permiso para ver este log" });
+      }
     }
 
     res.json(callLog);

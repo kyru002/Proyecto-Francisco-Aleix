@@ -158,7 +158,7 @@ const recentAlbaranes = computed(() => store.albaranes.slice(0, 5));
               <div v-for="ticket in recentTickets" :key="ticket._id" class="ticket-list-item">
                 <div class="ticket-info">
                   <div class="ticket-title">{{ ticket.title }}</div>
-                  <div class="ticket-meta">{{ ticket.client }} • Asignado a: {{ ticket.technician || 'Sin asignar' }}</div>
+                  <div class="ticket-meta">{{ ticket.cliente?.nombreEmpresa || 'Cargando...' }} • Asignado a: {{ ticket.tecnico?.nombre || 'Sin asignar' }}</div>
                 </div>
                 <div class="ticket-badges">
                   <span class="badge" :class="'badge-' + ticket.status">{{ ticket.status }}</span>

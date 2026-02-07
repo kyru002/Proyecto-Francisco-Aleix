@@ -18,8 +18,8 @@ const store = useAppStore();
 
 const allNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin'] },
-  { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['admin', 'trabajador', 'cliente'] },
-  { name: 'Albaranes', path: '/albaranes', icon: FileText, roles: ['admin', 'trabajador'] },
+  { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['admin', 'tecnico', 'cliente'] },
+  { name: 'Albaranes', path: '/albaranes', icon: FileText, roles: ['admin', 'tecnico'] },
   { name: 'Equipo', path: '/technicians', icon: Users, roles: ['admin'] },
   { name: 'Clientes', path: '/clients', icon: Users, roles: ['admin'] },
 ];

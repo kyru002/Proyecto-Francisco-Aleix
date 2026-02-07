@@ -16,7 +16,7 @@ const showCreateModal = ref(false);
 const newTecnico = ref({
   nombre: '',
   email: '',
-  role: 'trabajador',
+  role: 'tecnico',
   puesto: 'Técnico de Soporte',
   empresa: '', 
   estado: 'activo',
@@ -43,7 +43,7 @@ const handleCreateTecnico = async () => {
     newTecnico.value = { 
         nombre: '', 
         email: '', 
-        role: 'trabajador', 
+        role: 'tecnico', 
         puesto: 'Técnico de Soporte', 
         empresa: '', 
         estado: 'activo',
@@ -128,7 +128,7 @@ const toggleMenu = (tecnicoId) => {
               <td>
                 <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem;">
                   <Shield style="width: 14px; height: 14px; color: var(--primary);" />
-                  {{ tecnico.role === 'admin' ? 'Administrador' : 'Empleado' }}
+                  {{ tecnico.role === 'admin' ? 'Administrador' : 'Técnico' }}
                 </div>
               </td>
               <td>
@@ -177,7 +177,7 @@ const toggleMenu = (tecnicoId) => {
             <div class="form-group">
               <label class="form-label">Rol del Usuario</label>
               <select v-model="editingTecnico.role" class="form-input form-select" required>
-                <option value="technician">Técnico</option>
+                <option value="tecnico">Técnico</option>
                 <option value="admin">Administrador</option>
               </select>
             </div>
@@ -216,7 +216,7 @@ const toggleMenu = (tecnicoId) => {
             <div class="form-group">
               <label class="form-label">Rol del Usuario</label>
               <select v-model="newTecnico.role" class="form-input form-select" required>
-                <option value="trabajador">Trabajador (Técnico)</option>
+                <option value="tecnico">Técnico</option>
                 <option value="admin">Administrador</option>
               </select>
             </div>

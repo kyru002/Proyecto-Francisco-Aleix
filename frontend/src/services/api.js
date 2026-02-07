@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = '/api';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -70,6 +70,7 @@ export const trabajadoresService = {
     getEquipo: () => api.get('/trabajadores/equipo').then(res => res.data),
     cambiarPassword: (id, data) => api.patch(`/trabajadores/${id}/cambiar-password`, data).then(res => res.data),
     login: (email, password) => api.post('/trabajadores/auth/login', { email, password }).then(res => res.data),
+    registerEmpresa: (data) => api.post('/trabajadores/auth/register-empresa', data).then(res => res.data),
 };
 
 export const albaranesService = {

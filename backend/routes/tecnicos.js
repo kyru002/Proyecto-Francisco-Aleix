@@ -1,9 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const Tecnico = require("../models/Tecnico");
+const auth = require("../middleware/auth");
+const checkRole = require("../middleware/checkRole");
 
-// Obtener todos los técnicos
-router.get("/", async (req, res) => {
+// Obtener todos los técnicos (Protegido - Admin/Técnico)
+router.get("/", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const technicians = await Tecnico.find().sort({ createdAt: -1 });
         res.json(technicians);
@@ -12,8 +14,8 @@ router.get("/", async (req, res) => {
     }
 });
 
-// Crear un nuevo técnico
-router.post("/", async (req, res) => {
+// Crear un nuevo técnico (SOLO ADMIN)
+router.post("/", auth, checkRole(['admin']), async (req, res) => {
     try {
         const newTecnico = new Tecnico(req.body);
         const savedTecnico = await newTecnico.save();
@@ -23,8 +25,8 @@ router.post("/", async (req, res) => {
     }
 });
 
-// Actualizar un técnico
-router.put("/:id", async (req, res) => {
+// Actualizar un técnico (SOLO ADMIN)
+router.put("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
         const updatedTecnico = await Tecnico.findByIdAndUpdate(
             req.params.id,
@@ -37,11 +39,11 @@ router.put("/:id", async (req, res) => {
     }
 });
 
-// Eliminar un técnico
-router.delete("/:id", async (req, res) => {
+// Eliminar un técnico (SOLO ADMIN)
+router.delete("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
         await Tecnico.findByIdAndDelete(req.params.id);
-        res.json({ msg: "Técnico eliminado" });
+        res.json({ msg: "Técnico eliminado correctamente" });
     } catch (error) {
         res.status(500).json({ msg: "Error al eliminar el técnico" });
     }
