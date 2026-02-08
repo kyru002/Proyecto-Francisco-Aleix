@@ -20,6 +20,7 @@ export const useAppStore = defineStore('app', {
                 let albaranesPromise;
                 let tecnicosPromise;
                 let clientesPromise;
+                let trabajadoresPromise;
 
                 if (this.currentUser?.role === 'cliente') {
                     // Coger el ID de empresa tanto si está en clienteId como en empresa
@@ -34,12 +35,16 @@ export const useAppStore = defineStore('app', {
                     // Cargar los datos de la empresa propia para que aparezca en el modal de tickets
                     clientesPromise = cleanId ? clientesService.getById(cleanId).then(c => [c]).catch(() => []) : Promise.resolve([]);
 
+                    // Cargar trabajadores de la empresa
+                    trabajadoresPromise = cleanId ? trabajadoresService.getByEmpresa(cleanId).catch(() => []) : Promise.resolve([]);
+
                     tecnicosPromise = Promise.resolve([]);
                 } else {
                     ticketsPromise = ticketsService.getAll();
                     albaranesPromise = albaranesService.getAll();
                     tecnicosPromise = trabajadoresService.getEquipo();
                     clientesPromise = clientesService.getAll();
+                    trabajadoresPromise = trabajadoresService.getAll();
                 }
 
                 // Ejecutar en paralelo pero capturar errores individualmente para no bloquear todo
@@ -48,6 +53,7 @@ export const useAppStore = defineStore('app', {
                     tecnicosPromise,
                     clientesPromise,
                     albaranesPromise,
+                    trabajadoresPromise
                 ]);
 
                 if (results[0].status === 'fulfilled') this.tickets = results[0].value;
@@ -61,6 +67,9 @@ export const useAppStore = defineStore('app', {
 
                 if (results[3].status === 'fulfilled') this.albaranes = results[3].value;
                 else console.error('Error fetching albaranes:', results[3].reason);
+
+                if (results[4].status === 'fulfilled') this.trabajadores = results[4].value;
+                else console.error('Error fetching trabajadores:', results[4].reason);
 
             } catch (error) {
                 console.error('Unexpected error in fetchAll:', error);
@@ -219,5 +228,11 @@ export const useAppStore = defineStore('app', {
             this.currentUser = user;
             localStorage.setItem('currentUser', JSON.stringify(user));
         }
+    },
+    getters: {
+        // Contar tickets sin asignar (tecnico === null)
+        ticketsSinAsignar: (state) => {
+            return state.tickets.filter(t => !t.tecnico || t.tecnico === null).length;
+        },
     },
 });

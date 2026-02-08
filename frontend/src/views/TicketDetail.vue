@@ -1023,7 +1023,7 @@ const formatDate = (date) => {
     </div>
 
     <!-- Ticket Details -->
-    <div v-else-if="ticket" style="display: flex; flex-direction: column; gap: 1.5rem; height: 100vh; overflow: hidden;">
+    <div v-else-if="ticket" style="display: flex; flex-direction: column; gap: 1.5rem; min-height: calc(100vh - 120px);">
       <!-- Detalles del Ticket - Collapsible -->
       <details class="ticket-details-collapsible" style="border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; flex-shrink: 0;">
         <summary style="
@@ -1108,7 +1108,7 @@ const formatDate = (date) => {
       </details>
 
       <!-- Panel Principal - Chat y Llamadas -->
-      <div class="card" style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;">
+      <div class="card" style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: auto;">
         <div class="card-header">
           <h2 class="card-title">
             <MessageCircle style="width: 20px; height: 20px; display: inline; margin-right: 0.5rem;" />
@@ -1319,44 +1319,22 @@ const formatDate = (date) => {
         </div>
 
         <!-- Área de Mensajes -->
-        <div class="card-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
-          <div v-if="messages.length === 0" style="text-align: center; color: var(--muted-foreground); padding: 2rem 1rem;">
+        <div class="card-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem;">
+          <div v-if="messages.length === 0" style="text-align: center; color: var(--muted-foreground); padding: 2rem 1rem; margin: auto;">
             <MessageCircle style="width: 40px; height: 40px; opacity: 0.2; margin-bottom: 1rem;" />
             <p>No hay mensajes aún. Sé el primero en escribir.</p>
           </div>
 
-          <div v-for="(msg, index) in messages" :key="index" class="message-item">
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-              <div style="
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                background-color: var(--primary);
-                color: white;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: bold;
-                font-size: 0.875rem;
-                flex-shrink: 0;
-              ">
-                {{ msg.author.charAt(0).toUpperCase() }}
-              </div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                  <strong style="font-size: 0.875rem;">{{ msg.author }}</strong>
-                  <span style="
-                    font-size: 0.75rem;
-                    padding: 0.2rem 0.5rem;
-                    background-color: var(--muted);
-                    border-radius: 3px;
-                    text-transform: capitalize;
-                  ">{{ msg.role }}</span>
-                  <span style="font-size: 0.75rem; color: var(--muted-foreground);">{{ formatDate(msg.createdAt) }}</span>
-                </div>
-                <p style="margin: 0; line-height: 1.4; word-break: break-word;">{{ msg.content }}</p>
-              </div>
+          <div 
+            v-for="(msg, index) in messages" 
+            :key="index" 
+            class="message-item"
+            :class="{ 'message-own': msg.author === (store.currentUser?.nombre || store.currentUser?.name) }"
+          >
+            <div style="font-size: 0.75rem; color: var(--muted-foreground); margin-bottom: 0.25rem; font-weight: 500;">
+              {{ msg.author }} • {{ formatDate(msg.createdAt) }}
             </div>
+            <p style="margin: 0; line-height: 1.4; word-break: break-word;">{{ msg.content }}</p>
           </div>
         </div>
 
@@ -1421,10 +1399,36 @@ const formatDate = (date) => {
 }
 
 .message-item {
-  padding: 0.75rem;
-  background-color: var(--background);
-  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  max-width: 75%;
+  word-wrap: break-word;
+  display: flex;
+  flex-direction: column;
   animation: slideIn 0.3s ease-out;
+}
+
+.message-item:not(.message-own) {
+  align-self: flex-start;
+  background-color: #f1f1f1;
+  color: #333;
+  border-bottom-left-radius: 4px;
+}
+
+.message-item.message-own {
+  align-self: flex-end;
+  background-color: #dcf8c6;
+  color: #000;
+  border-bottom-right-radius: 4px;
+}
+
+.message-item:not(.message-own) + .message-item.message-own,
+.message-item.message-own + .message-item:not(.message-own) {
+  margin-top: 0.5rem;
+}
+
+.message-own strong {
+  display: none;
 }
 
 .video-container {
@@ -1434,6 +1438,7 @@ const formatDate = (date) => {
   padding: 1rem;
   background-color: var(--muted);
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .incoming-call-modal {

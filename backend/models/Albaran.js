@@ -52,6 +52,18 @@ const AlbaranSchema = new mongoose.Schema({
                 type: Number,
                 required: true,
                 min: 0.01
+            },
+            precio: {
+                type: Number,
+                required: false,
+                default: 0,
+                min: 0
+            },
+            importe: {
+                type: Number,
+                required: false,
+                default: 0,
+                min: 0
             }
         }
     ],

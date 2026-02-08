@@ -21,7 +21,7 @@ router.get("/equipo", auth, checkRole(['admin', 'tecnico']), async (req, res) =>
     }
 });
 
-// Obtener todos los trabajadores de una empresa (Protegido)
+// Obtener todos los trabajadores de una empresa (Protegido) - ANTES de la raíz /
 router.get("/empresa/:empresaId", auth, async (req, res) => {
     try {
         // Control de acceso para clientes
@@ -32,6 +32,31 @@ router.get("/empresa/:empresaId", auth, async (req, res) => {
         const trabajadores = await Trabajador.find({ empresa: req.params.empresaId })
             .populate("empresa")
             .sort({ createdAt: -1 });
+        res.json(trabajadores);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener trabajadores", error: error.message });
+    }
+});
+
+// Obtener todos los trabajadores (Protegido - Admin ve todos, otros ven solo su empresa)
+router.get("/", auth, async (req, res) => {
+    try {
+        let filter = {};
+        
+        // Si no es admin, solo puede ver trabajadores de su empresa
+        if (req.user.role !== 'admin') {
+            if (req.user.empresa) {
+                filter.empresa = req.user.empresa;
+            } else {
+                // Si no tiene empresa asignada, solo puede verse a sí mismo
+                filter._id = req.user.id;
+            }
+        }
+        
+        const trabajadores = await Trabajador.find(filter)
+            .populate("empresa")
+            .select("-password")
+            .sort({ nombre: 1 });
         res.json(trabajadores);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener trabajadores", error: error.message });
@@ -64,19 +89,37 @@ router.get("/:id", auth, async (req, res) => {
 // Crear nuevo trabajador (Admin o Admin de Empresa)
 router.post("/", auth, async (req, res) => {
     try {
+        console.log("📝 POST /trabajadores - Creando nuevo trabajador");
+        console.log("📦 Body recibido:", req.body);
+        console.log("👤 Usuario actual:", { id: req.user.id, role: req.user.role, empresa: req.user.empresa });
+        
         const { nombre, email, telefono, puesto, empresa, role } = req.body;
 
-        // Control de Acceso: El rol solicitado
+        // Control de Acceso
         let finalRole = role || 'tecnico';
+        let empresaFinal = empresa;
 
         if (req.user.role === 'cliente') {
             // Un cliente solo puede crear trabajadores para SU empresa y con rol 'cliente'
-            if (empresa && empresa !== req.user.empresa) {
+            if (empresa && empresa !== req.user.empresa.toString()) {
                 return res.status(403).json({ message: "Solo puedes crear trabajadores para tu propia empresa" });
             }
             finalRole = 'cliente';
-        } else if (req.user.role !== 'admin') {
-            return res.status(403).json({ message: "Solo los administradores pueden crear personal de soporte" });
+            empresaFinal = req.user.empresa;
+            console.log("✅ Usuario cliente creando trabajador para su empresa");
+        } else if (req.user.role === 'admin') {
+            // Admin puede crear trabajadores para cualquier empresa con el rol especificado
+            // Si se envía role='cliente', el trabajador será cliente de esa empresa
+            // Si se envía role='tecnico', será técnico
+            // Si no se especifica, será técnico por defecto
+            if (empresa && !role) {
+                // Si se especifica empresa pero no rol, asumir role='cliente'
+                finalRole = 'cliente';
+            }
+            console.log("✅ Usuario admin creando trabajador");
+        } else {
+            // Otros roles no pueden crear trabajadores
+            return res.status(403).json({ message: "No tienes permiso para crear trabajadores" });
         }
 
         // Validar campos requeridos
@@ -85,31 +128,99 @@ router.post("/", auth, async (req, res) => {
         }
 
         // Verificar que el email no exista ya
-        const trabajadorExistente = await Trabajador.findOne({ email: email.toLowerCase() });
+        const emailLower = email.toLowerCase();
+        const trabajadorExistente = await Trabajador.findOne({ email: emailLower });
         if (trabajadorExistente) {
+            console.log("⚠️ Email ya registrado:", emailLower);
             return res.status(400).json({ message: "El email ya está registrado" });
         }
 
         // Generar contraseña temporal
-        const contraseñaTemporal = Trabajador.generarContraseñaTemporal();
+        function generarContraseñaTemporal() {
+            const caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+            let contraseña = "";
+            for (let i = 0; i < 12; i++) {
+                contraseña += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+            }
+            return contraseña;
+        }
+        const contraseñaTemporal = generarContraseñaTemporal();
 
-        // Crear nuevo trabajador
-        const nuevoTrabajador = new Trabajador({
-            nombre,
-            email: email.toLowerCase(),
-            telefono,
-            puesto,
-            empresa: req.user.role === 'cliente' ? req.user.empresa : empresa,
+        // Crear nuevo trabajador - sin validaciones automáticas por ahora
+        const dataGuardar = {
+            nombre: nombre.trim(),
+            email: emailLower,
+            telefono: (telefono || '').trim(),
+            puesto: puesto.trim(),
             password: contraseñaTemporal,
             contraseñaTemporal: true,
             role: finalRole,
             estado: "activo"
-        });
+        };
+        
+        // Agregar empresa solo si existe
+        if (empresaFinal) {
+            dataGuardar.empresa = empresaFinal;
+        }
 
-        const trabajadorGuardado = await nuevoTrabajador.save();
-        res.status(201).json({ ...trabajadorGuardado.toObject(), contraseñaTemporalTexto: contraseñaTemporal });
+        console.log("💾 Intentando guardar trabajador con datos:", dataGuardar);
+        
+        const nuevoTrabajador = new Trabajador(dataGuardar);
+        console.log("📋 Documento creado:", nuevoTrabajador);
+        
+        // Intentar guardar
+        let trabajadorGuardado;
+        try {
+            trabajadorGuardado = await nuevoTrabajador.save();
+            console.log("✅ Trabajador guardado exitosamente en BD con ID:", trabajadorGuardado._id);
+            console.log("✅ Verificando que se guardó:", {
+                _id: trabajadorGuardado._id,
+                nombre: trabajadorGuardado.nombre,
+                email: trabajadorGuardado.email,
+                role: trabajadorGuardado.role
+            });
+        } catch (saveError) {
+            console.error("❌ Error durante el save():", saveError.message);
+            console.error("Error details:", {
+                name: saveError.name,
+                code: saveError.code,
+                keyPattern: saveError.keyPattern,
+                keyValue: saveError.keyValue
+            });
+            throw saveError;
+        }
+        
+        // Populate empresa si existe
+        if (trabajadorGuardado.empresa) {
+            try {
+                trabajadorGuardado = await Trabajador.findById(trabajadorGuardado._id).populate("empresa");
+                console.log("✅ Empresa populada");
+            } catch (popError) {
+                console.warn("⚠️ Error al popular empresa:", popError.message);
+                // No es crítico, continuar con respuesta
+            }
+        }
+        
+        // Crear respuesta incluyendo la contraseña temporal
+        const respuestaTrabajador = trabajadorGuardado.toObject();
+        respuestaTrabajador.contraseñaTemporalTexto = contraseñaTemporal;
+        
+        console.log("📤 Respuesta enviada con ID:", respuestaTrabajador._id);
+        res.status(201).json(respuestaTrabajador);
     } catch (error) {
-        res.status(500).json({ message: "Error al crear trabajador", error: error.message });
+        console.error("❌ Error al crear trabajador:", error.message);
+        console.error("Stack:", error.stack);
+        
+        // Dar respuesta de error específica
+        if (error.code === 11000) {
+            return res.status(400).json({ message: "El email ya está registrado (error de índice)" });
+        }
+        
+        res.status(500).json({ 
+            message: "Error al crear trabajador", 
+            error: error.message,
+            details: error.keyPattern || null
+        });
     }
 });
 

@@ -12,8 +12,13 @@ router.get("/", auth, async (req, res) => {
         // Control de Acceso: Si es cliente, solo ve sus propios tickets
         if (req.user.role === 'cliente') {
             filter.cliente = req.user.empresa;
+        } else if (req.user.role === 'tecnico') {
+            // Los técnicos solo ven tickets de su empresa
+            if (req.user.empresa) {
+                filter.cliente = req.user.empresa;
+            }
         } else {
-            // Admin y técnicos pueden filtrar por cliente si lo desean
+            // Solo Admin puede filtrar por cliente si lo desea
             const { clienteId } = req.query;
             if (clienteId && clienteId !== 'undefined' && clienteId !== 'null') {
                 filter.cliente = clienteId;
@@ -36,9 +41,14 @@ router.post("/", auth, async (req, res) => {
     try {
         const ticketData = { ...req.body };
 
-        // Si es cliente, forzar que el ticket sea de su empresa
+        // Si es cliente o técnico, forzar que el ticket sea de su empresa
         if (req.user.role === 'cliente') {
             ticketData.cliente = req.user.empresa;
+        } else if (req.user.role === 'tecnico' && req.user.empresa) {
+            // Los técnicos crean tickets para su propia empresa si no se especifica
+            if (!ticketData.cliente) {
+                ticketData.cliente = req.user.empresa;
+            }
         }
 
         const newTicket = new Ticket(ticketData);

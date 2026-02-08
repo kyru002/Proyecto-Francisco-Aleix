@@ -41,7 +41,7 @@ const newTrabajador = ref({
   nombre: '',
   email: '',
   telefono: '',
-  puesto: 'Técnico'
+  puesto: 'Cliente'
 });
 const editingTrabajador = ref(null);
 const showEditTrabajadorModal = ref(false);
@@ -112,24 +112,12 @@ const handleDeleteClient = async (id) => {
   }
 };
 
-const toggleExpand = async (clientId) => {
+const toggleExpand = (clientId) => {
   if (expandedClientId.value === clientId) {
     expandedClientId.value = null;
   } else {
     expandedClientId.value = clientId;
-    // Cargar trabajadores de esta empresa
-    if (!trabajadoresPorEmpresa.value[clientId]) {
-      try {
-        const trabajadores = store.trabajadores.filter(t => {
-          const empresaId = t.empresa._id || t.empresa;
-          return empresaId === clientId || empresaId === String(clientId);
-        });
-        trabajadoresPorEmpresa.value[clientId] = trabajadores;
-      } catch (err) {
-        console.error('Error al cargar trabajadores:', err);
-        trabajadoresPorEmpresa.value[clientId] = [];
-      }
-    }
+    // Los trabajadores se obtienen del store a través de getTrabajadoresEmpresa()
   }
 };
 
@@ -140,32 +128,31 @@ const openTrabajadorModal = (client) => {
     nombre: '',
     email: '',
     telefono: '',
-    puesto: 'Técnico'
+    puesto: 'Cliente'
   };
   showTrabajadorModal.value = true;
 };
 
 const handleCreateTrabajador = async () => {
-  if (!newTrabajador.value.nombre || !newTrabajador.value.email || !newTrabajador.value.puesto) {
-    alert('Por favor completa todos los campos requeridos');
+  if (!newTrabajador.value.nombre || !newTrabajador.value.email) {
+    alert('Por favor completa nombre y email');
     return;
   }
 
   try {
     const trabajadorData = {
-      ...newTrabajador.value,
+      nombre: newTrabajador.value.nombre,
+      email: newTrabajador.value.email,
+      telefono: newTrabajador.value.telefono,
+      puesto: 'Cliente',
+      role: 'cliente',
       empresa: selectedClientForTrabajador.value._id
     };
     
     const result = await store.createTrabajador(trabajadorData);
     
-    // Recargar trabajadores de la empresa
-    const trabajadores = store.trabajadores.filter(t => {
-      const empresaId = t.empresa._id || t.empresa;
-      return empresaId === selectedClientForTrabajador.value._id || 
-             empresaId === String(selectedClientForTrabajador.value._id);
-    });
-    trabajadoresPorEmpresa.value[selectedClientForTrabajador.value._id] = trabajadores;
+    // El store.trabajadores se actualiza automáticamente en createTrabajador
+    // getTrabajadoresEmpresa() lo recogerá desde el store
     
     // Mostrar modal con contraseña temporal
     if (result.contraseñaTemporalTexto) {
@@ -173,7 +160,16 @@ const handleCreateTrabajador = async () => {
       showPasswordModal.value = true;
     }
     
+    // Limpiar formulario
+    newTrabajador.value = {
+      nombre: '',
+      email: '',
+      telefono: '',
+      puesto: 'Cliente'
+    };
+    
     showTrabajadorModal.value = false;
+    alert('Trabajador creado correctamente');
   } catch (err) {
     alert('Error al crear trabajador: ' + err.message);
   }
@@ -188,12 +184,8 @@ const handleUpdateTrabajador = async () => {
   try {
     await store.updateTrabajador(editingTrabajador.value._id, editingTrabajador.value);
     
-    // Recargar trabajadores
-    const trabajadores = store.trabajadores.filter(t => {
-      const empresaId = t.empresa._id || t.empresa;
-      return empresaId === selectedClientForTrabajador.value._id;
-    });
-    trabajadoresPorEmpresa.value[selectedClientForTrabajador.value._id] = trabajadores;
+    // El store.trabajadores se actualiza automáticamente
+    // getTrabajadoresEmpresa() lo recogerá desde el store
     
     showEditTrabajadorModal.value = false;
     alert('Trabajador actualizado correctamente');
@@ -209,12 +201,8 @@ const handleDeleteTrabajador = async (trabajadorId, empresaId) => {
   try {
     await store.deleteTrabajador(trabajadorId);
     
-    // Recargar trabajadores
-    const trabajadores = store.trabajadores.filter(t => {
-      const tEmpresaId = t.empresa._id || t.empresa;
-      return tEmpresaId === empresaId || tEmpresaId === String(empresaId);
-    });
-    trabajadoresPorEmpresa.value[empresaId] = trabajadores;
+    // El store.trabajadores se actualiza automáticamente
+    // getTrabajadoresEmpresa() lo recogerá desde el store
     
     alert('Trabajador eliminado correctamente');
   } catch (err) {
@@ -232,7 +220,13 @@ const copyPassword = async (text) => {
 };
 
 const getTrabajadoresEmpresa = (clientId) => {
-  return trabajadoresPorEmpresa.value[clientId] || [];
+  // Obtener trabajadores del store en lugar de local state
+  // Esto asegura que siempre se muestren los datos del servidor
+  return store.trabajadores.filter(t => {
+    const empresaId = t.empresa?._id || t.empresa;
+    const clientIdStr = clientId._id || clientId;
+    return empresaId === clientIdStr || empresaId === String(clientIdStr);
+  });
 };
 </script>
 
@@ -324,6 +318,13 @@ const getTrabajadoresEmpresa = (clientId) => {
                 {{ getTrabajadoresEmpresa(cliente._id).length }}
               </div>
               <div style="font-size: 0.75rem; color: var(--muted-foreground);">trabajadores</div>
+            </div>
+
+            <div style="text-align: right; padding: 0 0.75rem; border-left: 1px solid var(--border);">
+              <div style="font-weight: 600; color: var(--success); font-size: 1.125rem;">
+                {{ cliente.horasUsadas || 0 }}h
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted-foreground);">horas usadas</div>
             </div>
             
             <button
@@ -553,14 +554,10 @@ const getTrabajadoresEmpresa = (clientId) => {
               <label class="form-label">Teléfono</label>
               <input v-model="newTrabajador.telefono" type="tel" class="form-input" />
             </div>
-            <div class="form-group">
-              <label class="form-label">Puesto *</label>
-              <select v-model="newTrabajador.puesto" class="form-input form-select" required>
-                <option value="Técnico">Técnico</option>
-                <option value="Gerente">Gerente</option>
-                <option value="Supervisor">Supervisor</option>
-                <option value="Administrativo">Administrativo</option>
-              </select>
+            <div class="form-group" style="background-color: #f0f4f8; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
+              <p style="margin: 0; font-size: 0.875rem; color: #64748b;">
+                <strong>Rol asignado:</strong> Cliente de {{ selectedClientForTrabajador.nombreEmpresa }}
+              </p>
             </div>
           </form>
         </div>

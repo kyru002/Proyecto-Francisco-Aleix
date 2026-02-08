@@ -8,8 +8,7 @@ import {
   Users, 
   LogOut,
   FileText,
-  ChevronRight,
-  Plus
+  AlertCircle
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -33,6 +32,15 @@ const handleLogout = () => {
   store.logout();
   router.push('/login');
 };
+
+const handleAlertClick = () => {
+  router.push('/tickets?sin-asignar=true');
+};
+
+const goToProfile = () => {
+  router.push('/profile');
+};
+
 </script>
 
 <template>
@@ -42,6 +50,10 @@ const handleLogout = () => {
         <Ticket />
       </div>
       <span class="sidebar-title">SupportDesk</span>
+      <div v-if="store.ticketsSinAsignar > 0 && store.currentUser?.role !== 'cliente'" class="alert-badge" :title="`${store.ticketsSinAsignar} tickets sin asignar`" @click="handleAlertClick" style="cursor: pointer;">
+        <AlertCircle style="width: 14px; height: 14px;" />
+        <span style="font-size: 0.75rem; font-weight: 600;">{{ store.ticketsSinAsignar }}</span>
+      </div>
     </div>
 
     <nav class="sidebar-nav">
@@ -58,9 +70,15 @@ const handleLogout = () => {
     </nav>
 
     <div class="sidebar-footer">
-      <div v-if="store.currentUser" class="sidebar-user">
+      <div 
+        v-if="store.currentUser" 
+        class="sidebar-user" 
+        style="cursor: pointer; padding: 0.5rem; border-radius: var(--radius); transition: background-color 0.15s ease;" 
+        @click="goToProfile"
+        :title="`Ver perfil de ${store.currentUser.name}`"
+      >
         <div class="sidebar-avatar">
-          {{ store.currentUser.name.charAt(0) }}
+          {{ store.currentUser.name?.charAt(0) || 'U' }}
         </div>
         <div class="sidebar-user-info">
           <div class="sidebar-user-name truncate">{{ store.currentUser.name }}</div>
