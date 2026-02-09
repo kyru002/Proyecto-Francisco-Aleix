@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAppStore } from '../stores/appStore';
 import { 
   Plus, 
@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next';
 
 const router = useRouter();
+const route = useRoute();
 const store = useAppStore();
 const showCreateModal = ref(false);
 const newTicket = ref({
@@ -38,22 +39,30 @@ const openCreateModal = () => {
   showCreateModal.value = true;
 };
 
-onMounted(async () => {
-  await store.fetchAll();
-});
-
 const editingTicket = ref(null);
 const showEditModal = ref(false);
 const searchQuery = ref('');
 const filterStatus = ref('');
 const filterPriority = ref('');
 const filterCliente = ref('');
+const filterSinAsignar = ref(false);
+
+onMounted(async () => {
+  // Detectar si viene del query param sin-asignar=true
+  if (route.query['sin-asignar'] === 'true') {
+    filterSinAsignar.value = true;
+  }
+  await store.fetchAll();
+});
 
 const clearFilters = () => {
   searchQuery.value = '';
   filterStatus.value = '';
   filterPriority.value = '';
   filterCliente.value = '';
+  filterSinAsignar.value = false;
+  // Limpiar el query param si existe
+  router.push('/tickets');
 };
 
 // Computed property para filtrar tickets
@@ -69,6 +78,11 @@ const filteredTickets = computed(() => {
         return ticketEmpresaId === userEmpresaId;
       });
     }
+  }
+
+  // Filtro: Solo tickets sin asignar
+  if (filterSinAsignar.value) {
+    tickets = tickets.filter(t => !t.tecnico || t.tecnico === null);
   }
 
   // Filtro por cliente (Admin/Trabajador)
@@ -206,7 +220,7 @@ const saveQuickAssign = async () => {
         <h1 class="page-title">Tickets de Soporte</h1>
         <p class="page-subtitle">Gestiona y responde a las solicitudes de ayuda</p>
       </div>
-      <button v-if="store.currentUser?.role !== 'tecnico'" @click="openCreateModal" class="btn btn-primary">
+      <button v-if="store.currentUser?.role === 'admin' || store.currentUser?.role === 'cliente'" @click="openCreateModal" class="btn btn-primary">
         <Plus />
         Nuevo Ticket
       </button>
@@ -239,6 +253,12 @@ const saveQuickAssign = async () => {
           <option value="media">Media</option>
           <option value="baja">Baja</option>
         </select>
+
+        <!-- Checkbox para filtrar sin asignar -->
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background-color: var(--muted); flex-wrap: nowrap; white-space: nowrap;" :class="{ 'active': filterSinAsignar }">
+          <input type="checkbox" v-model="filterSinAsignar" style="cursor: pointer;">
+          <span style="font-size: 0.875rem;">Solo sin asignar</span>
+        </label>
 
         <button @click="clearFilters" class="btn btn-ghost" style="padding: 0.5rem;" title="Limpiar filtros">
           <Filter style="width: 18px; height: 18px;" />

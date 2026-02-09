@@ -29,8 +29,10 @@ router.get("/estado/:estado", auth, async (req, res) => {
     try {
         const filter = { estado: req.params.estado };
 
-        // Control de acceso: Clientes solo ven sus propios albaranes
+        // Control de acceso: Clientes y técnicos solo ven albaranes de su empresa
         if (req.user.role === 'cliente') {
+            filter.cliente = req.user.empresa;
+        } else if (req.user.role === 'tecnico' && req.user.empresa) {
             filter.cliente = req.user.empresa;
         }
 
@@ -71,7 +73,13 @@ router.get("/", auth, async (req, res) => {
 
         if (req.user.role === 'cliente') {
             filter.cliente = req.user.empresa;
+        } else if (req.user.role === 'tecnico') {
+            // Los técnicos solo ven albaranes de su empresa
+            if (req.user.empresa) {
+                filter.cliente = req.user.empresa;
+            }
         } else {
+            // Solo Admin puede filtrar por cliente si lo desea
             const { cliente } = req.query;
             if (cliente) filter.cliente = cliente;
         }
@@ -162,6 +170,28 @@ router.put("/:id", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
 router.patch("/:id/estado", auth, checkRole(['admin', 'tecnico']), async (req, res) => {
     try {
         const { estado } = req.body;
+
+        // Obtener albarán actual para verificar estado previo
+        const albaranPrevio = await Albaran.findById(req.params.id);
+        const horasTotal = albaranPrevio.lineas.reduce((sum, linea) => sum + (linea.cantidad || 0), 0);
+
+        // Si cambia de "entregado" a otro estado, restar horas
+        if (albaranPrevio.estado === 'entregado' && estado !== 'entregado') {
+            await Cliente.findByIdAndUpdate(
+                albaranPrevio.cliente,
+                { $inc: { horasUsadas: -horasTotal } },
+                { new: true }
+            );
+        }
+        // Si cambia a "entregado" desde otro estado, sumar horas
+        else if (albaranPrevio.estado !== 'entregado' && estado === 'entregado') {
+            await Cliente.findByIdAndUpdate(
+                albaranPrevio.cliente,
+                { $inc: { horasUsadas: horasTotal } },
+                { new: true }
+            );
+        }
+
         const albaran = await Albaran.findByIdAndUpdate(
             req.params.id,
             { estado },
@@ -189,6 +219,10 @@ router.patch("/:id/entregar", auth, async (req, res) => {
             return res.status(403).json({ message: "No puedes firmar albaranes de otra empresa" });
         }
 
+        // Calcular horas totales del albarán
+        const horasTotal = albaranPre.lineas.reduce((sum, linea) => sum + (linea.cantidad || 0), 0);
+
+        // Actualizar albarán
         const albaran = await Albaran.findByIdAndUpdate(
             req.params.id,
             {
@@ -199,6 +233,13 @@ router.patch("/:id/entregar", auth, async (req, res) => {
             { new: true }
         ).populate(['cliente', 'tecnico', 'ticket']);
 
+        // Sumar horas al cliente
+        await Cliente.findByIdAndUpdate(
+            albaranPre.cliente,
+            { $inc: { horasUsadas: horasTotal } },
+            { new: true }
+        );
+
         res.json(albaran);
     } catch (error) {
         res.status(400).json({ message: "Error al marcar como entregado", error: error.message });
@@ -208,10 +249,23 @@ router.patch("/:id/entregar", auth, async (req, res) => {
 // Eliminar albarán (SOLO ADMIN)
 router.delete("/:id", auth, checkRole(['admin']), async (req, res) => {
     try {
-        const albaran = await Albaran.findByIdAndDelete(req.params.id);
+        const albaran = await Albaran.findById(req.params.id);
+        
         if (!albaran) {
             return res.status(404).json({ message: "Albarán no encontrado" });
         }
+
+        // Si el albarán estaba entregado, restar horas del cliente
+        if (albaran.estado === 'entregado') {
+            const horasTotal = albaran.lineas.reduce((sum, linea) => sum + (linea.cantidad || 0), 0);
+            await Cliente.findByIdAndUpdate(
+                albaran.cliente,
+                { $inc: { horasUsadas: -horasTotal } },
+                { new: true }
+            );
+        }
+
+        await Albaran.findByIdAndDelete(req.params.id);
         res.json({ message: "Albarán eliminado correctamente" });
     } catch (error) {
         res.status(500).json({ message: "Error al eliminar el albarán", error: error.message });

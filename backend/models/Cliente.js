@@ -25,6 +25,11 @@ const ClienteSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Trabajador',
         default: null
+    },
+    horasUsadas: {
+        type: Number,
+        default: 0,
+        min: 0
     }
 }, {
     timestamps: true
