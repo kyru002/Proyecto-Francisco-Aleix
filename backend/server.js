@@ -19,8 +19,14 @@ const io = new Server(server, {
 // Conectar a MongoDB
 connectDB();
 
-// Middlewares
-app.use(cors());
+// Middlewares - CORS configurado para permitir Firebase
+const corsOptions = {
+  origin: ["https://supportdesk-b7836.web.app", "http://localhost:5173", "http://localhost:3000"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
