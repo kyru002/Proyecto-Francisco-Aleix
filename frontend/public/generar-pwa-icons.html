@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Iconos PWA - SupportDesk</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #4f46e5;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        button:hover {
+            background: #4338ca;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-icon {
+            font-size: 20px;
+        }
+        
+        .preview {
+            display: none;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .preview.active {
+            display: block;
+        }
+        
+        .preview h3 {
+            color: #1e293b;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+        
+        .preview-item {
+            text-align: center;
+        }
+        
+        .preview-item img {
+            width: 100%;
+            max-width: 150px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+        }
+        
+        .preview-item p {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .success {
+            background: #10b981;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .success.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .instructions {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+        
+        .instructions h4 {
+            color: #1e293b;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .instructions ol {
+            padding-left: 20px;
+            color: #475569;
+            line-height: 1.8;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .instructions code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #4f46e5;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Generar Iconos PWA</h1>
+        <p class="subtitle">Crea los iconos necesarios para tu Progressive Web App</p>
+        
+        <div class="btn-group">
+            <button id="btn192" onclick="generateIcon(192)">
+                <span>Generar icon-192.png</span>
+                <span class="btn-icon">📱</span>
+            </button>
+            <button id="btn512" onclick="generateIcon(512)">
+                <span>Generar icon-512.png</span>
+                <span class="btn-icon">🖥️</span>
+            </button>
+            <button id="btnApple" onclick="generateIcon(180, 'apple-touch-icon')">
+                <span>Generar apple-touch-icon.png</span>
+                <span class="btn-icon">🍎</span>
+            </button>
+            <button onclick="generateAll()" style="background: #059669;">
+                <span>⚡ Generar Todos los Iconos</span>
+            </button>
+        </div>
+        
+        <div id="preview" class="preview">
+            <h3>Vista Previa:</h3>
+            <div id="previewGrid" class="preview-grid"></div>
+        </div>
+        
+        <div id="success" class="success">
+            ✅ ¡Iconos generados! Haz clic derecho → "Guardar imagen como..."
+        </div>
+        
+        <div class="instructions">
+            <h4>📋 Instrucciones:</h4>
+            <ol>
+                <li>Haz clic en los botones para generar los iconos</li>
+                <li>Haz clic derecho en cada imagen → "Guardar imagen como..."</li>
+                <li>Guarda en: <code>frontend/public/</code></li>
+                <li>Nombres exactos: <code>icon-192.png</code>, <code>icon-512.png</code>, <code>apple-touch-icon.png</code></li>
+                <li>Reinicia el servidor: <code>npm run dev</code></li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function generateIcon(size, customName = null) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Fondo azul #4f46e5
+            ctx.fillStyle = '#4f46e5';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Dibujar icono de ticket (líneas)
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = size * 0.06;
+            ctx.lineCap = 'round';
+            
+            const padding = size * 0.25;
+            const lineSpacing = size * 0.12;
+            
+            // Líneas del ticket
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(padding, padding + (i * lineSpacing));
+                ctx.lineTo(size - padding, padding + (i * lineSpacing));
+                ctx.stroke();
+            }
+            
+            // Icono de cámara (videollamadas)
+            const camSize = size * 0.18;
+            const camX = size * 0.7;
+            const camY = size * 0.65;
+            
+            // Cuerpo de la cámara
+            ctx.fillStyle = 'white';
+            ctx.fillRect(camX - camSize/2, camY - camSize/3, camSize, camSize * 0.7);
+            
+            // Lente
+            ctx.beginPath();
+            ctx.arc(camX, camY, camSize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Visor lateral
+            ctx.beginPath();
+            ctx.moveTo(camX + camSize/2, camY - camSize/6);
+            ctx.lineTo(camX + camSize * 0.8, camY - camSize/3);
+            ctx.lineTo(camX + camSize * 0.8, camY + camSize/3);
+            ctx.lineTo(camX + camSize/2, camY + camSize/6);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Texto "SupportDesk" (solo en iconos grandes)
+            if (size >= 192) {
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${size * 0.08}px system-ui, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('SupportDesk', size / 2, size - padding * 0.5);
+            }
+            
+            // Convertir a imagen
+            const fileName = customName ? `${customName}.png` : `icon-${size}.png`;
+            const preview = document.getElementById('preview');
+            const grid = document.getElementById('previewGrid');
+            
+            preview.classList.add('active');
+            
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.download = fileName;
+            img.title = `Clic derecho → Guardar como ${fileName}`;
+            img.style.cursor = 'pointer';
+            
+            img.onclick = function() {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            };
+            
+            const label = document.createElement('p');
+            label.textContent = fileName;
+            
+            item.appendChild(img);
+            item.appendChild(label);
+            grid.appendChild(item);
+            
+            // Mostrar mensaje de éxito
+            const success = document.getElementById('success');
+            success.classList.add('show');
+            
+            // Deshabilitar botón
+            const btnId = customName === 'apple-touch-icon' ? 'btnApple' : `btn${size}`;
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '✅ Generado';
+            }
+        }
+        
+        function generateAll() {
+            // Limpiar vista previa
+            document.getElementById('previewGrid').innerHTML = '';
+            
+            // Generar todos los iconos
+            setTimeout(() => generateIcon(192), 100);
+            setTimeout(() => generateIcon(512), 200);
+            setTimeout(() => generateIcon(180, 'apple-touch-icon'), 300);
+        }
+    </script>
+</body>
+</html>

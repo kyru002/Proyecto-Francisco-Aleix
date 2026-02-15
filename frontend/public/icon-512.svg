@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="106" fill="#4f46e5"/>
+  <g transform="translate(86, 86)">
+    <path fill="white" d="M170 43C170 54.4558 160.456 64 149 64H64C52.5442 64 43 54.4558 43 43V43C43 31.5442 52.5442 22 64 22H149C160.456 22 170 31.5442 170 43V43Z"/>
+    <path fill="white" d="M170 96C170 107.456 160.456 117 149 117H64C52.5442 117 43 107.456 43 96V96C43 84.5442 52.5442 75 64 75H149C160.456 75 170 84.5442 170 96V96Z"/>
+    <path fill="white" d="M170 149C170 160.456 160.456 170 149 170H64C52.5442 170 43 160.456 43 149V149C43 137.544 52.5442 128 64 128H149C160.456 128 170 137.544 170 149V149Z"/>
+    <path fill="white" d="M170 203C170 214.456 160.456 224 149 224H64C52.5442 224 43 214.456 43 203V203C43 191.544 52.5442 181 64 181H149C160.456 181 170 191.544 170 203V203Z"/>
+    <!-- Icono de video llamada -->
+    <path fill="#fbbf24" d="M235 75L277 53V160L235 138V75Z"/>
+    <rect x="170" y="53" width="64" height="107" rx="11" fill="#fbbf24"/>
+    <!-- Chat bubble -->
+    <circle cx="256" cy="256" r="64" fill="#8b5cf6"/>
+    <path fill="white" d="M232 256C232 242.745 242.745 232 256 232C269.255 232 280 242.745 280 256C280 269.255 269.255 280 256 280L232 280V256Z"/>
+  </g>
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="white" text-anchor="middle">SupportDesk</text>
+</svg>

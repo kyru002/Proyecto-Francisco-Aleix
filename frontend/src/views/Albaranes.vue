@@ -167,7 +167,6 @@ const handleCreateAlbaran = async () => {
 
     // Validar que todas las líneas tengan concepto y cantidad
     const lineasValidas = newAlbaran.value.lineas.every(linea => {
-      console.log('Validando línea:', linea);
       return linea.concepto && 
              linea.concepto.trim() !== '' &&
              typeof linea.cantidad === 'number' && 
@@ -197,10 +196,8 @@ const handleCreateAlbaran = async () => {
       notas: newAlbaran.value.notas || ''
     };
 
-    console.log('Enviando albarán:', JSON.stringify(datosAlbaran, null, 2));
     
     const respuesta = await store.createAlbaran(datosAlbaran);
-    console.log('Respuesta del servidor:', respuesta);
     
     showCreateModal.value = false;
     newAlbaran.value = {

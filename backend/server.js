@@ -39,20 +39,19 @@ app.use("/api/callLogs", require("./routes/callLogs"));
 app.use("/api/trabajadores", require("./routes/trabajadores"));
 app.use("/api/ai", auth, require("./routes/ai"));
 
-// Ruta inicial
-// Ruta inicial
+// Ruta de prueba del estado del servidor
 app.get("/", (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const statusText = {
-    0: "Desconnectat",
-    1: "Connectat ✅",
-    2: "Connectant...",
-    3: "Desconnectant..."
+    0: "Desconectado",
+    1: "Conectado ✅",
+    2: "Conectando...",
+    3: "Desconectando..."
   };
   res.send(`
-    <h1>Estat de l'API</h1>
-    <p>Servidor: <strong>Funcionant</strong></p>
-    <p>Base de Dades (MongoDB): <strong>${statusText[dbStatus] || "Desconegut"}</strong></p>
+    <h1>Estado del API</h1>
+    <p>Servidor: <strong>Funcionando</strong></p>
+    <p>Base de Datos (MongoDB): <strong>${statusText[dbStatus] || "Desconocido"}</strong></p>
     <p>Host: ${mongoose.connection.host || 'N/A'}</p>
   `);
 });
@@ -62,35 +61,21 @@ const callRooms = new Map(); // Mapeo de ticket IDs a llamadas activas
 const activeCallLogs = new Map(); // Mapeo de socket ID a CallLog ID para tracking
 
 io.on("connection", (socket) => {
-  console.log("Nuevo cliente conectado:", socket.id);
-
-  // DEBUG: Capturar todos los eventos socket para diagnosticar
-  const originalOn = socket.on.bind(socket);
-  socket.on = function (event, ...args) {
-    if (!['disconnect'].includes(event)) {
-      console.log(`📡 Listener registrado para evento: "${event}"`);
-    }
-    return originalOn(event, ...args);
-  };
+  console.log("✅ Cliente conectado:", socket.id);
 
   // Manejar mensajes de chat en tiempo real
   socket.on("chat-message", (data) => {
     const { ticketId, message } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`💬 Nuevo mensaje en sala ${room}:`, message.content);
-
     // Retransmitir a todos en la sala EXCEPTO al que lo envió (él ya lo ve localmente)
     socket.broadcast.to(room).emit("new-chat-message", message);
   });
-
-  // DEBUG: Log de todos los eventos emitidos al socket
 
   // Unirse a sala de ticket
   socket.on("join-ticket-room", (ticketId, userData) => {
     const room = `ticket-${ticketId}`;
     socket.join(room);
-    console.log(`${userData.name} (${userData.role}) se unió a ${room}`);
-
+    
     // Notificar a otros en la sala
     socket.broadcast.to(room).emit("user-joined", {
       userId: socket.id,
@@ -103,44 +88,28 @@ io.on("connection", (socket) => {
   socket.on("incoming-call", (data) => {
     const { ticketId, offer, callerName, callType } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`\n☎️ INCOMING-CALL RECIBIDO (Nueva llamada)`);
-    console.log(`   Caller: ${callerName}`);
-    console.log(`   Type: ${callType}`);
-    console.log(`   Room: ${room}`);
-    console.log(`   Socket ID: ${socket.id}`);
-
+    
     // Enviar a todos en la sala EXCEPTO al que envia
-    console.log(`   📤 Emitiendo 'incoming-call' a otros...`);
     socket.broadcast.to(room).emit("incoming-call", {
       from: socket.id,
       callerName: callerName,
       callType: callType,
       offer: offer
     });
-
-    console.log(`   ✅ Evento emitido\n`);
   });
 
   // Manejar oferta de renegotiación (durante una llamada en curso)
   socket.on("call-offer", (data) => {
     const { ticketId, offer, callerName, callType } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`\n🔄 CALL-OFFER RECIBIDO (Renegotiation)`);
-    console.log(`   Caller: ${callerName}`);
-    console.log(`   Type: ${callType}`);
-    console.log(`   Room: ${room}`);
-    console.log(`   Socket ID: ${socket.id}`);
-
+    
     // Enviar a todos en la sala EXCEPTO al que envia
-    console.log(`   📤 Emitiendo 'call-offer' a otros...`);
     socket.broadcast.to(room).emit("call-offer", {
       from: socket.id,
       callerName: callerName,
       callType: callType,
       offer: offer
     });
-
-    console.log(`   ✅ Evento emitido\n`);
   });
 
   // Manejar respuesta de videollamada
@@ -181,7 +150,6 @@ io.on("connection", (socket) => {
   socket.on("screen-share-started", (data) => {
     const { ticketId, from } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`Usuario ${from} comenzó a compartir pantalla`);
     socket.broadcast.to(room).emit("screen-share-started", {
       from: socket.id
     });
@@ -191,7 +159,6 @@ io.on("connection", (socket) => {
   socket.on("screen-share-stopped", (data) => {
     const { ticketId, from } = data;
     const room = `ticket-${ticketId}`;
-    console.log(`Usuario ${from} dejó de compartir pantalla`);
     socket.broadcast.to(room).emit("screen-share-stopped", {
       from: socket.id
     });
@@ -199,18 +166,8 @@ io.on("connection", (socket) => {
 
   // Registrar inicio de llamada
   socket.on("call-started", async (data) => {
-    console.log(`\n🔔 EVENTO RECIBIDO: call-started (socket: ${socket.id})`);
-    console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
-
     try {
       const { callerSocketId, callerName, receiverSocketId, receiverName, ticketId, callType } = data;
-
-      console.log(`📞 Registrando inicio de llamada:`, {
-        caller: callerName,
-        receiver: receiverName,
-        type: callType,
-        ticket: ticketId
-      });
 
       const newCallLog = new CallLog({
         callerSocketId,
@@ -224,31 +181,20 @@ io.on("connection", (socket) => {
       });
 
       const savedCallLog = await newCallLog.save();
-
-      // Almacenar el ID del CallLog SOLO para el caller (receiver se añadirá cuando acepte)
       activeCallLogs.set(callerSocketId, savedCallLog._id.toString());
-
-      console.log(`✅ CallLog registrado (ID: ${savedCallLog._id}) - esperando aceptación de ${receiverName || 'receptor'}\n`);
     } catch (error) {
-      console.error("❌ Error registrando inicio de llamada:", error);
-      console.error('Stack:', error.stack);
+      console.error("❌ Error registrando inicio de llamada:", error.message);
     }
   });
 
   // Registrar aceptación de llamada
   socket.on("call-accepted", async (data) => {
-    console.log(`\n✅ EVENTO RECIBIDO: call-accepted (socket: ${socket.id})`);
-    console.log('📦 Datos recibidos:', JSON.stringify(data, null, 2));
-
     try {
-      const { callerSocketId, receiverSocketId, receiverName, ticketId } = data;
-
-      console.log(`✅ Registrando aceptación de llamada por socket: ${socket.id}`);
-
+      const { callerSocketId, receiverSocketId, receiverName } = data;
       const callLogId = activeCallLogs.get(callerSocketId);
 
       if (callLogId) {
-        const updatedCallLog = await CallLog.findByIdAndUpdate(
+        await CallLog.findByIdAndUpdate(
           callLogId,
           {
             status: "aceptada",
@@ -257,15 +203,11 @@ io.on("connection", (socket) => {
           },
           { new: true }
         );
-        // Ahora registrar también en el Map para el receiver
+        // Registrar también en el Map para el receiver
         activeCallLogs.set(socket.id, callLogId);
-        console.log(`✅ CallLog (${callLogId}) actualizado a "aceptada" por ${socket.id}\n`);
-      } else {
-        console.warn(`⚠️ No se encontró CallLog para callerSocketId: ${callerSocketId}`);
       }
     } catch (error) {
-      console.error("❌ Error registrando aceptación de llamada:", error);
-      console.error('Stack:', error.stack);
+      console.error("❌ Error registrando aceptación de llamada:", error.message);
     }
   });
 
@@ -273,9 +215,6 @@ io.on("connection", (socket) => {
   socket.on("call-rejected", async (data) => {
     try {
       const { callerSocketId } = data;
-
-      console.log(`❌ Registrando rechazo de llamada`);
-
       const callLogId = activeCallLogs.get(callerSocketId) || activeCallLogs.get(socket.id);
 
       if (callLogId) {
@@ -290,10 +229,9 @@ io.on("connection", (socket) => {
         );
         activeCallLogs.delete(callerSocketId);
         activeCallLogs.delete(socket.id);
-        console.log(`✅ CallLog actualizado a "rechazada"`);
       }
     } catch (error) {
-      console.error("Error registrando rechazo de llamada:", error);
+      console.error("❌ Error registrando rechazo de llamada:", error.message);
     }
   });
 
@@ -301,13 +239,10 @@ io.on("connection", (socket) => {
   socket.on("call-ended", async (data) => {
     try {
       const { duration, screenShared } = data;
-
-      console.log(`📞 Registrando término de llamada. Duración: ${duration}s, Screen shared: ${screenShared}`);
-
       const callLogId = activeCallLogs.get(socket.id);
 
       if (callLogId) {
-        const updatedCallLog = await CallLog.findByIdAndUpdate(
+        await CallLog.findByIdAndUpdate(
           callLogId,
           {
             status: "completada",
@@ -324,17 +259,15 @@ io.on("connection", (socket) => {
             activeCallLogs.delete(key);
           }
         });
-
-        console.log(`✅ CallLog registrado como completada. Duración total: ${updatedCallLog.duration}s`);
       }
     } catch (error) {
-      console.error("Error registrando término de llamada:", error);
+      console.error("❌ Error registrando término de llamada:", error.message);
     }
   });
 
   // Desconexión
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
+    console.log("❌ Cliente desconectado:", socket.id);
     io.emit("user-disconnected", {
       userId: socket.id
     });

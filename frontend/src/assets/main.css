@@ -195,6 +195,8 @@ body {
   padding: 0 1.5rem;
   height: 64px;
   border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+  position: relative;
 }
 
 .alert-badge {
@@ -235,6 +237,25 @@ body {
 .sidebar-nav {
   flex: 1;
   padding: 1rem 0.75rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--sidebar-muted);
 }
 
 .sidebar-nav-item {
@@ -269,6 +290,8 @@ body {
 .sidebar-footer {
   border-top: 1px solid var(--sidebar-border);
   padding: 1rem;
+  flex-shrink: 0;
+  background-color: var(--sidebar-bg);
 }
 
 .sidebar-user {
@@ -1405,9 +1428,10 @@ body {
   inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 30;
+  backdrop-filter: blur(2px);
 }
 
-.sidebar-overlay.open {
+.sidebar-overlay.active {
   display: block;
 }
 
@@ -1724,4 +1748,445 @@ body {
 /* Smooth transitions for interactive elements */
 * {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+/* ========================================
+   PWA & RESPONSIVE MOBILE STYLES
+   ======================================== */
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  /* Sidebar adaptativo en móvil */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Overlay para cerrar sidebar en mobile */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* Main content ocupa toda la pantalla en mobile */
+  .main-content.with-sidebar {
+    margin-left: 0 !important;
+    padding: 1rem;
+  }
+
+  /* Botón hamburguesa para abrir sidebar */
+  .mobile-menu-btn {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 998;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+  }
+
+  /* Tablas responsive */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Cards más compactas en móvil */
+  .card {
+    padding: 1rem;
+  }
+
+  /* Botones más grandes (mejor touch target) */
+  button,
+  .button {
+    min-height: 44px;
+    padding: 0.75rem 1.25rem;
+  }
+
+  /* Formularios adaptados */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Evita zoom en iOS */
+    min-height: 44px;
+  }
+
+  /* Modal fullscreen en móvil */
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Tickets grid → lista en móvil */
+  .tickets-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard stats apiladas */
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Formularios más usables en móvil */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Evita zoom automático en iOS */
+    padding: 0.875rem !important;
+  }
+
+  /* Botones más grandes para touch */
+  .btn,
+  button:not(.btn-close):not(.mobile-menu-btn) {
+    min-height: 48px !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 1rem !important;
+  }
+
+  /* Labels más legibles */
+  label {
+    font-size: 0.9375rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Reducir espaciado en contenedores */
+  .container,
+  .content-container {
+    padding: 0.75rem !important;
+  }
+
+  /* Cards más compactas */
+  .card {
+    padding: 1rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .card-header {
+    padding: 0.75rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .card-content {
+    padding: 0.75rem !important;
+  }
+
+  /* Textos adaptados */
+  h1 {
+    font-size: 1.75rem !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+  }
+
+  h3 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Tablas responsive con scroll horizontal */
+  .table-wrapper,
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 0 -0.75rem !important;
+    padding: 0 0.75rem !important;
+  }
+
+  table {
+    min-width: 600px !important;
+    font-size: 0.875rem !important;
+  }
+
+  table th,
+  table td {
+    padding: 0.625rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Ocultar columnas secundarias en tablas */
+  .table-hide-mobile {
+    display: none !important;
+  }
+
+  /* Modals fullscreen en móvil */
+  .modal {
+    padding: 0 !important;
+  }
+
+  .modal-content {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  .modal-header,
+  .modal-footer {
+    flex-shrink: 0 !important;
+  }
+
+  .modal-body {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 1rem !important;
+  }
+
+  /* Grids adaptativas */
+  .grid,
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Espaciado entre secciones */
+  section,
+  .section {
+    margin-bottom: 1.5rem !important;
+  }
+
+  /* Status badges más compactos */
+  .badge,
+  .status-badge {
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.625rem !important;
+  }
+
+  /* Avatares más pequeños */
+  .avatar,
+  .user-avatar {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  /* Dropdown menus fullwidth */
+  .dropdown-menu {
+    width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  /* Pagination compacta */
+  .pagination {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .pagination button {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+/* Para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .main-content.with-sidebar {
+    margin-left: 200px;
+  }
+
+  .sidebar {
+    width: 200px;
+  }
+
+  .tickets-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* PWA específicos */
+@media (display-mode: standalone) {
+  /* Estilos cuando se ejecuta como PWA instalada */
+  body {
+    padding-top: env(safe-area-inset-top); /* Respeta notch en iPhone */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Ocultar elementos innecesarios en PWA */
+  .install-banner {
+    display: none !important;
+  }
+}
+
+/* Orientación landscape en móvil */
+@media (max-width: 768px) and (orientation: landscape) {
+  .video-call-container {
+    flex-direction: row;
+  }
+
+  .video-local,
+  .video-remote {
+    width: 50%;
+    height: 100%;
+  }
+
+  /* Sidebar en landscape */
+  .sidebar {
+    width: 200px !important;
+  }
+
+  /* Reducir altura de header */
+  .sidebar-header {
+    height: 48px !important;
+    padding: 0 1rem !important;
+  }
+
+  /* Footer más compacto */
+  .sidebar-footer {
+    padding: 0.5rem !important;
+  }
+
+  /* Contenido principal ajustado */
+  .main-content {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Mejoras específicas para PWA */
+@media (max-width: 480px) {
+  /* Pantallas muy pequeñas */
+  body {
+    font-size: 14px !important;
+  }
+
+  .mobile-menu-btn {
+    padding: 0.625rem !important;
+  }
+
+  /* Mensajes de chat más compactos */
+  .message-bubble {
+    max-width: 85% !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Iconos más pequeños */
+  svg:not(.logo svg) {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Reducir gaps */
+  .flex,
+  .flex-row,
+  .flex-col {
+    gap: 0.5rem !important;
+  }
+}
+
+/* Mejoras para tablets en portrait */
+@media (min-width: 481px) and (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .modal-content {
+    width: 90vw !important;
+    height: auto !important;
+    max-height: 90vh !important;
+    border-radius: var(--radius) !important;
+  }
+
+  table {
+    min-width: 100% !important;
+  }
+}
+
+/* Touch interactions mejoradas */
+@media (hover: none) and (pointer: coarse) {
+  /* Es un dispositivo táctil */
+  button:active,
+  .button:active {
+    transform: scale(0.98);
+  }
+
+  /* Eliminar hover effects en touch */
+  *:hover {
+    /* Reset hovers que no funcionan bien en touch */
+  }
+
+  /* Aumentar áreas táctiles */
+  a,
+  button,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Dark mode support (opcional) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --muted: #1e293b;
+    --border: #334155;
+  }
+}
+
+/* Reduce motion para accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .sidebar,
+  .mobile-menu-btn,
+  button,
+  .pwa-banner {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+  }
 }

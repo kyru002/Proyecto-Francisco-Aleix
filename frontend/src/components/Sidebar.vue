@@ -11,6 +11,15 @@ import {
   AlertCircle
 } from 'lucide-vue-next';
 
+const props = defineProps({
+  mobileOpen: {
+    type: Boolean,
+    default: false
+  }
+});
+
+const emit = defineEmits(['close']);
+
 const route = useRoute();
 const router = useRouter();
 const store = useAppStore();
@@ -31,26 +40,38 @@ const navItems = computed(() => {
 const handleLogout = () => {
   store.logout();
   router.push('/login');
+  emit('close');
 };
 
-const handleAlertClick = () => {
+const handleAlertClick = (event) => {
+  event.stopPropagation(); // Evitar que active el goToHome del header
   router.push('/tickets?sin-asignar=true');
+  emit('close');
 };
 
 const goToProfile = () => {
   router.push('/profile');
+  emit('close');
+};
+
+const goToHome = () => {
+  const userRole = store.currentUser?.role || 'cliente';
+  // Admin va a Dashboard, otros a Tickets
+  const homePath = userRole === 'admin' ? '/dashboard' : '/tickets';
+  router.push(homePath);
+  emit('close');
 };
 
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="sidebar-header">
+  <aside class="sidebar" :class="{ 'mobile-open': mobileOpen }">
+    <div class="sidebar-header" @click="goToHome" style="cursor: pointer;" title="Volver al inicio">
       <div class="sidebar-logo">
         <Ticket />
       </div>
       <span class="sidebar-title">SupportDesk</span>
-      <div v-if="store.ticketsSinAsignar > 0 && store.currentUser?.role !== 'cliente'" class="alert-badge" :title="`${store.ticketsSinAsignar} tickets sin asignar`" @click="handleAlertClick" style="cursor: pointer;">
+      <div v-if="store.ticketsSinAsignar > 0 && store.currentUser?.role !== 'cliente'" class="alert-badge" :title="`${store.ticketsSinAsignar} tickets sin asignar`" @click="handleAlertClick($event)" style="cursor: pointer;">
         <AlertCircle style="width: 14px; height: 14px;" />
         <span style="font-size: 0.75rem; font-weight: 600;">{{ store.ticketsSinAsignar }}</span>
       </div>
@@ -63,6 +84,7 @@ const goToProfile = () => {
         :to="item.path"
         class="sidebar-nav-item"
         :class="{ active: route.path === item.path }"
+        @click="emit('close')"
       >
         <component :is="item.icon" />
         {{ item.name }}
@@ -74,7 +96,7 @@ const goToProfile = () => {
         v-if="store.currentUser" 
         class="sidebar-user" 
         style="cursor: pointer; padding: 0.5rem; border-radius: var(--radius); transition: background-color 0.15s ease;" 
-        @click="goToProfile"
+        @click="goToProfile()"
         :title="`Ver perfil de ${store.currentUser.name}`"
       >
         <div class="sidebar-avatar">

@@ -89,10 +89,6 @@ router.get("/:id", auth, async (req, res) => {
 // Crear nuevo trabajador (Admin o Admin de Empresa)
 router.post("/", auth, async (req, res) => {
     try {
-        console.log("📝 POST /trabajadores - Creando nuevo trabajador");
-        console.log("📦 Body recibido:", req.body);
-        console.log("👤 Usuario actual:", { id: req.user.id, role: req.user.role, empresa: req.user.empresa });
-        
         const { nombre, email, telefono, puesto, empresa, role } = req.body;
 
         // Control de Acceso
@@ -106,17 +102,12 @@ router.post("/", auth, async (req, res) => {
             }
             finalRole = 'cliente';
             empresaFinal = req.user.empresa;
-            console.log("✅ Usuario cliente creando trabajador para su empresa");
         } else if (req.user.role === 'admin') {
             // Admin puede crear trabajadores para cualquier empresa con el rol especificado
-            // Si se envía role='cliente', el trabajador será cliente de esa empresa
-            // Si se envía role='tecnico', será técnico
-            // Si no se especifica, será técnico por defecto
             if (empresa && !role) {
                 // Si se especifica empresa pero no rol, asumir role='cliente'
                 finalRole = 'cliente';
             }
-            console.log("✅ Usuario admin creando trabajador");
         } else {
             // Otros roles no pueden crear trabajadores
             return res.status(403).json({ message: "No tienes permiso para crear trabajadores" });
@@ -131,7 +122,6 @@ router.post("/", auth, async (req, res) => {
         const emailLower = email.toLowerCase();
         const trabajadorExistente = await Trabajador.findOne({ email: emailLower });
         if (trabajadorExistente) {
-            console.log("⚠️ Email ya registrado:", emailLower);
             return res.status(400).json({ message: "El email ya está registrado" });
         }
 
@@ -162,64 +152,33 @@ router.post("/", auth, async (req, res) => {
         if (empresaFinal) {
             dataGuardar.empresa = empresaFinal;
         }
-
-        console.log("💾 Intentando guardar trabajador con datos:", dataGuardar);
         
         const nuevoTrabajador = new Trabajador(dataGuardar);
-        console.log("📋 Documento creado:", nuevoTrabajador);
-        
-        // Intentar guardar
-        let trabajadorGuardado;
-        try {
-            trabajadorGuardado = await nuevoTrabajador.save();
-            console.log("✅ Trabajador guardado exitosamente en BD con ID:", trabajadorGuardado._id);
-            console.log("✅ Verificando que se guardó:", {
-                _id: trabajadorGuardado._id,
-                nombre: trabajadorGuardado.nombre,
-                email: trabajadorGuardado.email,
-                role: trabajadorGuardado.role
-            });
-        } catch (saveError) {
-            console.error("❌ Error durante el save():", saveError.message);
-            console.error("Error details:", {
-                name: saveError.name,
-                code: saveError.code,
-                keyPattern: saveError.keyPattern,
-                keyValue: saveError.keyValue
-            });
-            throw saveError;
-        }
+        const trabajadorGuardado = await nuevoTrabajador.save();
         
         // Populate empresa si existe
         if (trabajadorGuardado.empresa) {
-            try {
-                trabajadorGuardado = await Trabajador.findById(trabajadorGuardado._id).populate("empresa");
-                console.log("✅ Empresa populada");
-            } catch (popError) {
-                console.warn("⚠️ Error al popular empresa:", popError.message);
-                // No es crítico, continuar con respuesta
-            }
+            const trabajadorPopulado = await Trabajador.findById(trabajadorGuardado._id).populate("empresa");
+            const respuestaTrabajador = trabajadorPopulado.toObject();
+            respuestaTrabajador.contraseñaTemporalTexto = contraseñaTemporal;
+            return res.status(201).json(respuestaTrabajador);
         }
         
         // Crear respuesta incluyendo la contraseña temporal
         const respuestaTrabajador = trabajadorGuardado.toObject();
         respuestaTrabajador.contraseñaTemporalTexto = contraseñaTemporal;
-        
-        console.log("📤 Respuesta enviada con ID:", respuestaTrabajador._id);
         res.status(201).json(respuestaTrabajador);
     } catch (error) {
         console.error("❌ Error al crear trabajador:", error.message);
-        console.error("Stack:", error.stack);
         
         // Dar respuesta de error específica
         if (error.code === 11000) {
-            return res.status(400).json({ message: "El email ya está registrado (error de índice)" });
+            return res.status(400).json({ message: "El email ya está registrado" });
         }
         
         res.status(500).json({ 
             message: "Error al crear trabajador", 
-            error: error.message,
-            details: error.keyPattern || null
+            error: error.message
         });
     }
 });
@@ -345,22 +304,16 @@ router.post("/auth/register-empresa", async (req, res) => {
 router.post("/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log(`🔑 Intento de login: ${email}`);
 
         const trabajador = await Trabajador.findOne({ email: email.toLowerCase() }).populate("empresa");
-
         if (!trabajador) {
-            console.log(`❌ Usuario no encontrado: ${email}`);
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
 
         const isMatch = await trabajador.comparePassword(password);
         if (!isMatch) {
-            console.log(`❌ Contraseña incorrecta para: ${email}`);
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
-
-        console.log(`✅ Login exitoso: ${email} (Rol: ${trabajador.role})`);
 
         if (trabajador.estado !== "activo") {
             return res.status(401).json({ message: "Cuenta desactivada" });
