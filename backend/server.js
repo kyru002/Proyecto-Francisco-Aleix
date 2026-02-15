@@ -1,6 +1,8 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const mongoose = require("mongoose");
 const connectDB = require("./database");
 const { Server } = require("socket.io");
 const http = require("http");
@@ -32,8 +34,21 @@ app.use("/api/trabajadores", require("./routes/trabajadores"));
 app.use("/api/ai", auth, require("./routes/ai"));
 
 // Ruta inicial
+// Ruta inicial
 app.get("/", (req, res) => {
-  res.send("API funcionando correctamente");
+  const dbStatus = mongoose.connection.readyState;
+  const statusText = {
+    0: "Desconnectat",
+    1: "Connectat ✅",
+    2: "Connectant...",
+    3: "Desconnectant..."
+  };
+  res.send(`
+    <h1>Estat de l'API</h1>
+    <p>Servidor: <strong>Funcionant</strong></p>
+    <p>Base de Dades (MongoDB): <strong>${statusText[dbStatus] || "Desconegut"}</strong></p>
+    <p>Host: ${mongoose.connection.host || 'N/A'}</p>
+  `);
 });
 
 // WebSocket - Manejo de videollamadas
