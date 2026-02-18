@@ -55,7 +55,7 @@ const handleLogin = async () => {
             <label class="form-label">Correo Electrónico</label>
             <div class="input-with-icon">
               <Mail />
-              <input v-model="email" type="email" class="form-input" placeholder="correo@ejemplo.com" required>
+              <input v-model="email" type="email" class="form-input" required>
             </div>
           </div>
 
@@ -63,7 +63,7 @@ const handleLogin = async () => {
             <label class="form-label">Contraseña</label>
             <div class="input-with-icon">
               <Lock />
-              <input v-model="password" type="password" class="form-input" placeholder="••••••••" required>
+              <input v-model="password" type="password" class="form-input" required>
             </div>
           </div>
 

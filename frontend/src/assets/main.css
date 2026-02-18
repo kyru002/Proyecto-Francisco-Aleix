@@ -539,16 +539,16 @@ body {
 }
 
 .input-with-icon .form-input {
-  padding-left: 2.75rem;
+  padding-left: 3.75rem;
 }
 
 .input-with-icon svg {
   position: absolute;
-  left: 0.75rem;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: var(--muted-foreground);
 }
 
